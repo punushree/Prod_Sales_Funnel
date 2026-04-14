@@ -1,0 +1,34 @@
+# AOS Agent Platform — Python Dependencies
+# Install with:  pip install -r requirements.txt
+
+# ── Django core ───────────────────────────────
+Django==5.0.4
+djangorestframework==3.15.1
+django-cors-headers==4.3.1
+
+# ── Authentication ────────────────────────────
+djangorestframework-simplejwt==5.3.1
+
+# ── Database ──────────────────────────────────
+PyMySQL==1.1.1                  # MySQL driver (used as MySQLdb replacement)
+
+# ── Async task queue ──────────────────────────
+celery==5.3.6
+redis==5.0.3                    # Redis client for Celery broker
+
+# ── AI / LLM ──────────────────────────────────
+openai==1.30.1
+groq==0.9.0                     # Groq LLM client
+
+# ── HTTP requests ─────────────────────────────
+requests==2.32.3
+
+# ── Environment variables ─────────────────────
+python-dotenv==1.0.1
+
+# ── Production server ─────────────────────────
+gunicorn==22.0.0
+
+# ── Development tools (optional) ─────────────
+# django-debug-toolbar==4.3.0
+# ipython==8.24.0

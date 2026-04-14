@@ -1,0 +1,297 @@
+{
+  "name": "AOS Agent — Post-Call Automation",
+  "nodes": [
+
+    {
+      "id": "1",
+      "name": "Bolna Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "bolna-call-end",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "responseData": "{ \"status\": \"received\" }"
+      },
+      "notes": "STEP 1 — Bolna.ai hits this URL when a call ends.\nConfigure in Bolna dashboard → Webhook URL:\nhttps://your-n8n-instance.com/webhook/bolna-call-end\n\nExpected payload from Bolna:\n{\n  call_id, org_id, call_type (sales|service),\n  direction (inbound|outbound),\n  duration_seconds, status,\n  lead_id or customer_id,\n  transcript: { full_text, turns }\n}"
+    },
+
+    {
+      "id": "2",
+      "name": "Save Call + Transcript to DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DJANGO_BASE_URL }}/api/v1/calls/{{ $json.call_id }}/end/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"duration_seconds\": {{ $json.duration_seconds }},\n  \"status\": \"{{ $json.status }}\",\n  \"ended_at\": \"{{ $now.toISO() }}\",\n  \"transcript\": {{ JSON.stringify($json.transcript) }}\n}"
+      },
+      "notes": "STEP 2 — POST transcript to Django.\nDjango saves it and triggers Celery task for analysis.\nSet env var DJANGO_BASE_URL = https://your-server.com"
+    },
+
+    {
+      "id": "3",
+      "name": "Wait 30s for Analysis",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "parameters": {
+        "unit": "seconds",
+        "amount": 30
+      },
+      "notes": "STEP 3 — Give Celery time to run the AI analysis before we fetch results."
+    },
+
+    {
+      "id": "4",
+      "name": "Fetch Call Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.DJANGO_BASE_URL }}/api/v1/calls/{{ $('Bolna Webhook').item.json.call_id }}/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "notes": "STEP 4 — Fetch full call detail from Django including sentiment, keywords, conversion score, and any tickets raised."
+    },
+
+    {
+      "id": "5",
+      "name": "Sales or Service?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.call_type }}",
+        "rules": {
+          "rules": [
+            { "value2": "sales",   "output": 0 },
+            { "value2": "service", "output": 1 }
+          ]
+        }
+      },
+      "notes": "STEP 5 — Branch: sales calls go to CRM + conversion scoring. Service calls go to ticket handling."
+    },
+
+    {
+      "id": "6",
+      "name": "[SALES] High Conversion? (>0.6)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1340, 160],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.analysis.conversion_probability }}",
+              "operation": "larger",
+              "value2": 0.6
+            }
+          ]
+        }
+      },
+      "notes": "STEP 6a — If conversion probability > 60%, escalate to human sales agent immediately."
+    },
+
+    {
+      "id": "7",
+      "name": "[SALES] Notify Sales Agent — Hot Lead",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "typeVersion": 2,
+      "position": [1560, 80],
+      "parameters": {
+        "operation": "create",
+        "resource": "channelMessage",
+        "teamId": "={{ $env.TEAMS_SALES_TEAM_ID }}",
+        "channelId": "={{ $env.TEAMS_SALES_CHANNEL_ID }}",
+        "content": "=🔥 **Hot Lead Alert**\n\n**Lead:** {{ $('Fetch Call Analysis').item.json.lead?.name }}\n**Phone:** {{ $('Bolna Webhook').item.json.phone }}\n**Conversion Score:** {{ Math.round($json.analysis.conversion_probability * 100) }}%\n**Sentiment:** {{ $json.analysis.sentiment }}\n**Keywords:** {{ $json.analysis.keywords.join(', ') }}\n\n**Call Summary:**\n{{ $json.analysis.summary }}\n\n👉 [View full call]({{ $env.DASHBOARD_URL }}/calls/{{ $json.id }})"
+      },
+      "notes": "STEP 7a — Posts to your Teams Sales channel. Set env vars:\nTEAMS_SALES_TEAM_ID, TEAMS_SALES_CHANNEL_ID\n\nAlternative: swap this node for Slack → use 'Slack' node, channel #sales-leads"
+    },
+
+    {
+      "id": "8",
+      "name": "[SALES] Update Lead Status in Django",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 240],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.DJANGO_BASE_URL }}/api/v1/leads/{{ $('Bolna Webhook').item.json.lead_id }}/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"status\": \"{{ $('Fetch Call Analysis').item.json.analysis.conversion_probability > 0.6 ? 'interested' : 'called' }}\",\n  \"notes\": \"{{ $('Fetch Call Analysis').item.json.analysis.summary }}\"\n}"
+      },
+      "notes": "STEP 7b — Updates lead status in Django based on call outcome.\n'interested' if high score, 'called' otherwise."
+    },
+
+    {
+      "id": "9",
+      "name": "[SERVICE] Ticket Created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1340, 440],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.tickets.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "notes": "STEP 6b — Check if the AI analysis auto-created a ticket for this service call."
+    },
+
+    {
+      "id": "10",
+      "name": "[SERVICE] Notify Technician / Support",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "typeVersion": 2,
+      "position": [1560, 360],
+      "parameters": {
+        "operation": "create",
+        "resource": "channelMessage",
+        "teamId": "={{ $env.TEAMS_SERVICE_TEAM_ID }}",
+        "channelId": "={{ $env.TEAMS_SERVICE_CHANNEL_ID }}",
+        "content": "=🎫 **New Support Ticket**\n\n**Customer:** {{ $('Fetch Call Analysis').item.json.customer?.name }}\n**Issue:** {{ $json.tickets[0].issue_type }}\n**Description:** {{ $json.tickets[0].description }}\n**Sentiment:** {{ $json.analysis.sentiment }}\n\n**Assign to:** {{ $json.tickets[0].assigned_to || 'Unassigned' }}\n\n👉 [View ticket]({{ $env.DASHBOARD_URL }}/tickets/{{ $json.tickets[0].id }})"
+      },
+      "notes": "STEP 7c — Posts to Teams Service/Support channel.\nSet: TEAMS_SERVICE_TEAM_ID, TEAMS_SERVICE_CHANNEL_ID\n\nFor apartment clients: route to maintenance team channel\nFor healthcare: route to clinic admin channel"
+    },
+
+    {
+      "id": "11",
+      "name": "[SERVICE] Send Customer SMS / Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 520],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SMS_GATEWAY_URL }}",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"to\": \"{{ $('Bolna Webhook').item.json.phone }}\",\n  \"message\": \"Hi {{ $('Fetch Call Analysis').item.json.customer?.name }}, your ticket #{{ $json.tickets[0].id.slice(0,8).toUpperCase() }} has been raised. Our team will contact you within 24 hours. - {{ $('Fetch Call Analysis').item.json.org_name }}\"\n}"
+      },
+      "notes": "STEP 7d — Send ticket confirmation SMS to customer.\nReplace SMS_GATEWAY_URL with your provider:\n- Twilio: https://api.twilio.com/2010-04-01/Accounts/{SID}/Messages.json\n- MSG91: https://api.msg91.com/api/v5/flow/\n- Fast2SMS: https://www.fast2sms.com/dev/bulkV2"
+    },
+
+    {
+      "id": "12",
+      "name": "Log to Google Sheets (All Calls)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1780, 300],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": "={{ $env.GSHEET_ID }}",
+        "sheetName": "Call Logs",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Call ID":      "={{ $('Bolna Webhook').item.json.call_id }}",
+            "Org":          "={{ $('Fetch Call Analysis').item.json.org }}",
+            "Type":         "={{ $('Fetch Call Analysis').item.json.call_type }}",
+            "Direction":    "={{ $('Fetch Call Analysis').item.json.direction }}",
+            "Duration (s)": "={{ $('Fetch Call Analysis').item.json.duration_seconds }}",
+            "Sentiment":    "={{ $('Fetch Call Analysis').item.json.analysis?.sentiment }}",
+            "Conv. Score":  "={{ $('Fetch Call Analysis').item.json.analysis?.conversion_probability }}",
+            "Keywords":     "={{ $('Fetch Call Analysis').item.json.analysis?.keywords?.join(', ') }}",
+            "Summary":      "={{ $('Fetch Call Analysis').item.json.analysis?.summary }}",
+            "Tickets":      "={{ $('Fetch Call Analysis').item.json.tickets?.length }}",
+            "Timestamp":    "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "notes": "STEP 8 — Append every call to a Google Sheet for Punit sir's reporting.\nSet env var GSHEET_ID = your spreadsheet ID from the URL."
+    },
+
+    {
+      "id": "13",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "typeVersion": 2,
+      "position": [1120, 520],
+      "parameters": {
+        "operation": "create",
+        "resource": "channelMessage",
+        "teamId": "={{ $env.TEAMS_DEV_TEAM_ID }}",
+        "channelId": "={{ $env.TEAMS_DEV_CHANNEL_ID }}",
+        "content": "=⚠️ **n8n Flow Error**\n\nWorkflow: AOS Agent Post-Call\nNode: {{ $execution.lastNodeExecuted }}\nError: {{ $execution.error.message }}\nCall ID: {{ $('Bolna Webhook').item.json.call_id }}"
+      },
+      "notes": "Error handler — connect this to ALL node error outputs.\nPosts to your dev/tech team channel when anything fails."
+    }
+
+  ],
+
+  "connections": {
+    "Bolna Webhook":                     { "main": [[{ "node": "Save Call + Transcript to DB", "type": "main", "index": 0 }]] },
+    "Save Call + Transcript to DB":      { "main": [[{ "node": "Wait 30s for Analysis",        "type": "main", "index": 0 }]] },
+    "Wait 30s for Analysis":             { "main": [[{ "node": "Fetch Call Analysis",           "type": "main", "index": 0 }]] },
+    "Fetch Call Analysis":               { "main": [[{ "node": "Sales or Service?",             "type": "main", "index": 0 }]] },
+    "Sales or Service?": {
+      "main": [
+        [{ "node": "[SALES] High Conversion? (>0.6)",    "type": "main", "index": 0 }],
+        [{ "node": "[SERVICE] Ticket Created?",          "type": "main", "index": 0 }]
+      ]
+    },
+    "[SALES] High Conversion? (>0.6)": {
+      "main": [
+        [{ "node": "[SALES] Notify Sales Agent — Hot Lead", "type": "main", "index": 0 }],
+        [{ "node": "[SALES] Update Lead Status in Django",  "type": "main", "index": 0 }]
+      ]
+    },
+    "[SALES] Notify Sales Agent — Hot Lead": { "main": [[{ "node": "Log to Google Sheets (All Calls)", "type": "main", "index": 0 }]] },
+    "[SALES] Update Lead Status in Django":  { "main": [[{ "node": "Log to Google Sheets (All Calls)", "type": "main", "index": 0 }]] },
+    "[SERVICE] Ticket Created?": {
+      "main": [
+        [{ "node": "[SERVICE] Notify Technician / Support", "type": "main", "index": 0 }],
+        [{ "node": "Log to Google Sheets (All Calls)",      "type": "main", "index": 0 }]
+      ]
+    },
+    "[SERVICE] Notify Technician / Support": { "main": [[{ "node": "[SERVICE] Send Customer SMS / Email", "type": "main", "index": 0 }]] },
+    "[SERVICE] Send Customer SMS / Email":   { "main": [[{ "node": "Log to Google Sheets (All Calls)",    "type": "main", "index": 0 }]] }
+  },
+
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "Error Handler"
+  },
+
+  "env_vars_required": {
+    "DJANGO_BASE_URL":         "https://your-server.com",
+    "DASHBOARD_URL":           "https://your-dashboard.com",
+    "TEAMS_SALES_TEAM_ID":     "Get from MS Teams admin",
+    "TEAMS_SALES_CHANNEL_ID":  "Get from MS Teams admin",
+    "TEAMS_SERVICE_TEAM_ID":   "Get from MS Teams admin",
+    "TEAMS_SERVICE_CHANNEL_ID":"Get from MS Teams admin",
+    "TEAMS_DEV_TEAM_ID":       "Get from MS Teams admin",
+    "TEAMS_DEV_CHANNEL_ID":    "Get from MS Teams admin",
+    "GSHEET_ID":               "From Google Sheets URL",
+    "SMS_GATEWAY_URL":         "Twilio / MSG91 / Fast2SMS endpoint"
+  },
+
+  "how_to_import": [
+    "1. Open your n8n instance",
+    "2. Click + New Workflow",
+    "3. Click the ··· menu (top right) → Import from JSON",
+    "4. Paste this entire file",
+    "5. Set all env vars in Settings → Environment Variables",
+    "6. Add credentials: Django API key, Google Sheets OAuth, MS Teams OAuth",
+    "7. Activate the workflow — the webhook URL is auto-generated"
+  ]
+}

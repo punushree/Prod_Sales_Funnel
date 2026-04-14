@@ -1,0 +1,1397 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AOS Agent{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── GRID LAYOUTS ── */
+  .dash-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .dash-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;
+  }
+  .dash-grid-3 {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px;
+  }
+  @media (max-width: 960px) {
+    .dash-grid-2, .dash-grid-3 { grid-template-columns: 1fr; }
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.12); }
+  .kpi-card .kpi-glow {
+    position: absolute; top: -24px; right: -24px;
+    width: 80px; height: 80px; border-radius: 50%;
+    filter: blur(28px); opacity: 0.22;
+  }
+  .kpi-card .kpi-icon { font-size: 18px; margin-bottom: 8px; display: block; }
+  .kpi-card .kpi-value {
+    font-size: 1.9rem; font-weight: 800; line-height: 1;
+    letter-spacing: -0.02em; font-family: 'Outfit', sans-serif; margin-bottom: 4px;
+  }
+  .kpi-card .kpi-label {
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted);
+  }
+  .kpi-card .kpi-trend {
+    font-size: 10px; margin-top: 6px;
+  }
+  .trend-up { color: #4ade80; }
+  .trend-dn { color: #f87171; }
+
+  /* ── SECTION HEADING ── */
+  .section-head {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: #fff; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-head::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── PANEL CARD ── */
+  .panel-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+  }
+
+  /* ── QUOTA BANNER ALERTS ── */
+  .quota-alert {
+    display: flex; align-items: flex-start; gap: 12px;
+    border-radius: 12px; padding: 13px 16px; margin-bottom: 12px;
+    font-size: 13px; font-weight: 600; line-height: 1.5;
+    animation: fadeIn .4s ease;
+  }
+  .quota-alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .quota-alert.alert-danger  { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.3); color:#f87171; }
+  .quota-alert.alert-warning { background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.25); color:#fbbf24; }
+  .quota-alert strong { font-weight: 800; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+
+  /* ── QUOTA GRID (top 3 cards) ── */
+  .quota-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+    width: 100%;
+  }
+  @media(max-width:900px){ .quota-grid{ grid-template-columns:1fr; } }
+
+  .q-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    transition: border-color .2s, transform .2s;
+  }
+  .q-card:hover { transform: translateY(-2px); }
+  .q-card.q-ok     { border-color: rgba(52,211,153,.2); }
+  .q-card.q-warn   { border-color: rgba(251,191,36,.35); background: linear-gradient(135deg,#1a1500,#0f1000); }
+  .q-card.q-danger { border-color: rgba(248,113,113,.4); background: linear-gradient(135deg,#1a0a0a,#100505); }
+  .q-glow { position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;filter:blur(26px);opacity:.2;pointer-events:none; }
+  .q-top  { display:flex;align-items:center;justify-content:space-between;margin-bottom:10px; }
+  .q-icon-label { display:flex;align-items:center;gap:8px; }
+  .q-icon { font-size:16px; }
+  .q-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted); }
+  .q-badge { font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:.04em; }
+  .q-badge-ok     { background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.2); }
+  .q-badge-warn   { background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.3); }
+  .q-badge-danger { background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3); }
+  .q-numbers { display:flex;align-items:baseline;gap:6px;margin-bottom:10px; }
+  .q-used { font-size:2rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif; }
+  .q-of-total { font-size:13px;font-weight:600;color:var(--muted); }
+  .q-track { height:6px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin-bottom:7px; }
+  .q-fill  { height:100%;border-radius:4px;transition:width .8s ease; }
+  .q-sub   { font-size:11px;color:var(--muted); }
+  .q-sub a { color:var(--cyan);text-decoration:none;font-weight:600; }
+  .q-sub a:hover { color:#fff; }
+
+  /* ── BOTTOM QUOTA SECTION ── */
+  .quota-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  .quota-org-name { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 14px; display:flex;align-items:center;gap:8px; }
+  .quota-row { margin-bottom: 14px; }
+  .quota-row:last-child { margin-bottom: 0; }
+  .quota-meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; }
+  .quota-meta span:first-child { color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em;font-weight:700; }
+  .quota-meta span:last-child  { color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .quota-pct-tag { font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px; }
+
+  /* ── SENTIMENT BAR ── */
+  .sent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .sent-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  .sent-track { flex: 1; height: 6px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+  .sent-fill  { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .sent-pct   { font-size: 11px; font-weight: 700; min-width: 32px; text-align: right; }
+  .sent-label { font-size: 11px; color: var(--muted); min-width: 60px; }
+
+  /* ── TEMP BOXES ── */
+  .temp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .temp-box {
+    border-radius: 12px; padding: 10px 12px; text-align: center;
+  }
+  .temp-box .tv { font-size: 20px; font-weight: 800; font-family: 'Outfit', sans-serif; line-height: 1; }
+  .temp-box .tl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+  .temp-hot  { background: rgba(239,68,68,0.12);  }
+  .temp-warm { background: rgba(251,191,36,0.12); }
+
+  .temp-cold { background: rgba(0,229,255,0.1);   }
+
+  /* ── SCORE BAR ── */
+  .score-wrap { margin-bottom: 6px; }
+  .score-meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .score-meta span:first-child { color: var(--muted); }
+  .score-meta span:last-child  { color: #fff; font-weight: 700; }
+  .score-track { height: 5px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+  .score-fill  { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+  /* ── INTENT ROWS ── */
+  .intent-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px;
+  }
+  .intent-row:last-child { border-bottom: none; }
+  .intent-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .intent-bar { width: 70px; height: 4px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+  .intent-fill { height: 100%; border-radius: 4px; }
+
+  /* ── TAGS ── */
+  .tag {
+    display: inline-block; font-size: 11px; padding: 3px 9px;
+    border-radius: 20px; margin: 3px 3px 0 0;
+  }
+  .tag-objection { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid rgba(255,255,255,0.08); }
+  .tag-signal    { background: rgba(74,222,128,0.1);  color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .tag-keyword   { background: rgba(0,229,255,0.08);  color: var(--cyan); border: 1px solid rgba(0,229,255,0.15); }
+
+  /* ── OUTCOME ROWS ── */
+  .outcome-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px; color: var(--muted);
+  }
+  .outcome-row:last-child { border-bottom: none; }
+  .outcome-pill {
+    font-size: 11px; font-weight: 700; padding: 2px 10px;
+    border-radius: 20px; font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── MANUAL TRANSCRIPT SLOTS ── */
+  .manual-slot {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .manual-slot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .manual-slot-title {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 8px;
+    padding: 5px 10px;
+    color: #fff;
+    font-size: 12px;
+    font-family: 'Outfit', sans-serif;
+    flex: 1;
+    outline: none;
+  }
+  .manual-slot-title:focus { border-color: var(--cyan); }
+  .manual-slot-remove {
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.2);
+    color: #f87171;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .manual-slot-body {
+    width: 100%;
+    min-height: 100px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    color: #c5d4e8;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .manual-slot-body:focus { border-color: rgba(0,229,255,0.3); }
+  .manual-slot-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .manual-analyse-btn {
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 18px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.05em;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  .manual-analyse-btn:hover   { transform: translateY(-1px); }
+  .manual-analyse-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .manual-slot-status {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .manual-slot-result {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0,229,255,0.04);
+    border: 1px solid rgba(0,229,255,0.1);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+  .manual-result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .manual-result-row:last-child { border-bottom: none; }
+  .manual-result-key   { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; }
+  .manual-result-value { color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if user.role != 'super_admin' and user.org %}
+{% with org=user.org %}
+
+{# QUOTA ALERT BANNERS #}
+{% if org.calls_used >= org.call_quota %}
+<div class="quota-alert alert-danger">
+  <span class="quota-alert-icon">🚫</span>
+  <div><strong>Call Quota Exhausted</strong> — Your organisation has used all {{ org.call_quota }} allocated calls. New calls cannot be initiated until your quota is reset or increased by your super admin.</div>
+</div>
+{% elif org.calls_used >= org.call_quota|add:"-10" %}
+<div class="quota-alert alert-warning">
+  <span class="quota-alert-icon">⚠️</span>
+  <div><strong>Call Quota Almost Full</strong> — {{ org.calls_used }} / {{ org.call_quota }} calls used. Contact your super admin to increase the limit before it runs out.</div>
+</div>
+{% endif %}
+
+{% if org.minutes_used >= org.minutes_quota %}
+<div class="quota-alert alert-danger">
+  <span class="quota-alert-icon">⏱️</span>
+  <div><strong>Minutes Quota Exhausted</strong> — All {{ org.minutes_quota }} allocated minutes have been used. No further calls can be made this period.</div>
+</div>
+{% elif org.minutes_used >= org.minutes_quota|add:"-30" %}
+<div class="quota-alert alert-warning">
+  <span class="quota-alert-icon">⏳</span>
+  <div><strong>Minutes Quota Low</strong> — {{ org.minutes_used }} / {{ org.minutes_quota }} minutes used. Running low — please contact your super admin.</div>
+</div>
+{% endif %}
+
+{% if stats.allowed_numbers >= stats.number_quota %}
+<div class="quota-alert alert-danger">
+  <span class="quota-alert-icon">📵</span>
+  <div><strong>Number Quota Reached</strong> — You have added the maximum {{ stats.number_quota }} allowed phone numbers. Remove an existing number or request a quota increase.</div>
+</div>
+{% endif %}
+
+{# TOP 3 QUOTA CARDS #}
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;width:100%;box-sizing:border-box;">
+
+  {# CALLS #}
+  <div style="background:linear-gradient(135deg,{% if org.calls_used >= org.call_quota %}#1a0a0a,#100505{% elif org.calls_used >= org.call_quota|add:'-10' %}#1a1500,#0f1000{% else %}#0f1e2e,#0a1520{% endif %});border:1px solid {% if org.calls_used >= org.call_quota %}rgba(248,113,113,.4){% elif org.calls_used >= org.call_quota|add:'-10' %}rgba(251,191,36,.35){% else %}rgba(52,211,153,.2){% endif %};border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;box-sizing:border-box;transition:transform .2s;">
+    <div style="position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;filter:blur(26px);opacity:.2;background:{% if org.calls_used >= org.call_quota %}#f87171{% elif org.calls_used >= org.call_quota|add:'-10' %}#fbbf24{% else %}#34d399{% endif %};pointer-events:none;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">📞</span>
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Calls Used</span>
+      </div>
+      <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:{% if org.calls_used >= org.call_quota %}rgba(248,113,113,.12){% elif org.calls_used >= org.call_quota|add:'-10' %}rgba(251,191,36,.12){% else %}rgba(52,211,153,.1){% endif %};color:{% if org.calls_used >= org.call_quota %}#f87171{% elif org.calls_used >= org.call_quota|add:'-10' %}#fbbf24{% else %}#34d399{% endif %};border:1px solid {% if org.calls_used >= org.call_quota %}rgba(248,113,113,.3){% elif org.calls_used >= org.call_quota|add:'-10' %}rgba(251,191,36,.3){% else %}rgba(52,211,153,.2){% endif %};">{% if org.calls_used >= org.call_quota %}EXHAUSTED{% elif org.calls_used >= org.call_quota|add:'-10' %}LOW{% else %}OK{% endif %}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px;">
+      <span style="font-size:2rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;color:{% if org.calls_used >= org.call_quota %}#f87171{% elif org.calls_used >= org.call_quota|add:'-10' %}#fbbf24{% else %}#34d399{% endif %};">{{ org.calls_used }}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--muted);">/ {{ org.call_quota }} calls</span>
+    </div>
+    <div style="height:6px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin-bottom:7px;">
+      <div style="height:100%;border-radius:4px;transition:width .8s ease;width:{% if org.call_quota > 0 %}{% widthratio org.calls_used org.call_quota 100 %}{% else %}0{% endif %}%;background:{% if org.calls_used >= org.call_quota %}#f87171{% elif org.calls_used >= org.call_quota|add:'-10' %}#fbbf24{% else %}#34d399{% endif %};"></div>
+    </div>
+    <div style="font-size:11px;color:{% if org.calls_used >= org.call_quota %}#f87171{% else %}var(--muted){% endif %};">{% if org.calls_used >= org.call_quota %}<strong>⛔ No calls remaining</strong>{% else %}{{ org.call_quota|add:"-"|add:org.calls_used }} calls remaining{% endif %}</div>
+  </div>
+
+  {# MINUTES #}
+  <div style="background:linear-gradient(135deg,{% if org.minutes_used >= org.minutes_quota %}#1a0a0a,#100505{% elif org.minutes_used >= org.minutes_quota|add:'-30' %}#1a1500,#0f1000{% else %}#0f1e2e,#0a1520{% endif %});border:1px solid {% if org.minutes_used >= org.minutes_quota %}rgba(248,113,113,.4){% elif org.minutes_used >= org.minutes_quota|add:'-30' %}rgba(251,191,36,.35){% else %}rgba(0,229,255,.2){% endif %};border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;box-sizing:border-box;transition:transform .2s;">
+    <div style="position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;filter:blur(26px);opacity:.2;background:{% if org.minutes_used >= org.minutes_quota %}#f87171{% elif org.minutes_used >= org.minutes_quota|add:'-30' %}#fbbf24{% else %}var(--cyan){% endif %};pointer-events:none;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">⏱️</span>
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Minutes Used</span>
+      </div>
+      <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:{% if org.minutes_used >= org.minutes_quota %}rgba(248,113,113,.12){% elif org.minutes_used >= org.minutes_quota|add:'-30' %}rgba(251,191,36,.12){% else %}rgba(0,229,255,.08){% endif %};color:{% if org.minutes_used >= org.minutes_quota %}#f87171{% elif org.minutes_used >= org.minutes_quota|add:'-30' %}#fbbf24{% else %}var(--cyan){% endif %};border:1px solid {% if org.minutes_used >= org.minutes_quota %}rgba(248,113,113,.3){% elif org.minutes_used >= org.minutes_quota|add:'-30' %}rgba(251,191,36,.3){% else %}rgba(0,229,255,.2){% endif %};">{% if org.minutes_used >= org.minutes_quota %}EXHAUSTED{% elif org.minutes_used >= org.minutes_quota|add:'-30' %}LOW{% else %}OK{% endif %}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px;">
+      <span style="font-size:2rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;color:{% if org.minutes_used >= org.minutes_quota %}#f87171{% elif org.minutes_used >= org.minutes_quota|add:'-30' %}#fbbf24{% else %}var(--cyan){% endif %};">{{ org.minutes_used }}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--muted);">/ {{ org.minutes_quota }} min</span>
+    </div>
+    <div style="height:6px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin-bottom:7px;">
+      <div style="height:100%;border-radius:4px;transition:width .8s ease;width:{% if org.minutes_quota > 0 %}{% widthratio org.minutes_used org.minutes_quota 100 %}{% else %}0{% endif %}%;background:{% if org.minutes_used >= org.minutes_quota %}#f87171{% elif org.minutes_used >= org.minutes_quota|add:'-30' %}#fbbf24{% else %}var(--cyan){% endif %};"></div>
+    </div>
+    <div style="font-size:11px;color:{% if org.minutes_used >= org.minutes_quota %}#f87171{% else %}var(--muted){% endif %};">{% if org.minutes_used >= org.minutes_quota %}<strong>⛔ No minutes remaining</strong>{% else %}{{ org.minutes_quota|add:"-"|add:org.minutes_used }} min remaining{% endif %}</div>
+  </div>
+
+  {# NUMBERS #}
+  <div style="background:linear-gradient(135deg,{% if stats.allowed_numbers >= stats.number_quota %}#1a0a0a,#100505{% else %}#0f1e2e,#0a1520{% endif %});border:1px solid {% if stats.allowed_numbers >= stats.number_quota %}rgba(248,113,113,.4){% else %}rgba(167,139,250,.2){% endif %};border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;box-sizing:border-box;transition:transform .2s;">
+    <div style="position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;filter:blur(26px);opacity:.2;background:{% if stats.allowed_numbers >= stats.number_quota %}#f87171{% else %}#a78bfa{% endif %};pointer-events:none;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">📱</span>
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Numbers Used</span>
+      </div>
+      <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:{% if stats.allowed_numbers >= stats.number_quota %}rgba(248,113,113,.12){% else %}rgba(167,139,250,.1){% endif %};color:{% if stats.allowed_numbers >= stats.number_quota %}#f87171{% else %}#a78bfa{% endif %};border:1px solid {% if stats.allowed_numbers >= stats.number_quota %}rgba(248,113,113,.3){% else %}rgba(167,139,250,.2){% endif %};">{% if stats.allowed_numbers >= stats.number_quota %}FULL{% else %}OK{% endif %}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px;">
+      <span style="font-size:2rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;color:{% if stats.allowed_numbers >= stats.number_quota %}#f87171{% else %}#a78bfa{% endif %};">{{ stats.allowed_numbers }}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--muted);">/ {{ stats.number_quota }} numbers</span>
+    </div>
+    <div style="height:6px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin-bottom:7px;">
+      <div style="height:100%;border-radius:4px;transition:width .8s ease;width:{% if stats.number_quota > 0 %}{% widthratio stats.allowed_numbers stats.number_quota 100 %}{% else %}0{% endif %}%;background:{% if stats.allowed_numbers >= stats.number_quota %}#f87171{% else %}#a78bfa{% endif %};"></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);">{% if stats.allowed_numbers >= stats.number_quota %}<span style="color:#f87171;font-weight:700;">⛔ Quota full</span> — {% endif %}<a href="{% url 'numbers_page' %}" style="color:var(--cyan);text-decoration:none;font-weight:600;">Manage Numbers →</a></div>
+  </div>
+
+</div>
+{% endwith %}
+{% endif %}
+
+
+<!-- KPI CARDS -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;width:100%;box-sizing:border-box;">
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s,border-color .2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:var(--cyan);pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">📞</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:var(--cyan);">{{ stats.total_calls }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Total Calls</div>
+    <div style="font-size:10px;margin-top:6px;color:#4ade80;">↑ this month</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:#4ade80;pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">⭐</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:#4ade80;">{{ stats.total_leads }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Total Leads</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:#fbbf24;pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">🎫</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:#fbbf24;">{{ stats.open_tickets }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Open Tickets</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:#a78bfa;pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">👥</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:#a78bfa;">{{ stats.total_customers }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Customers</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:#f87171;pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">🔥</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:#f87171;">{{ stats.hot_leads|default:"0" }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Hot Leads</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:#4ade80;pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">📈</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:#4ade80;">{{ stats.avg_conv_prob|default:"0" }}%</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Avg Conv. Prob.</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:var(--cyan);pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">🎯</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:var(--cyan);">{{ stats.avg_lead_score|default:"0" }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Avg Lead Score</div>
+  </div>
+
+  {% if user.role == 'super_admin' %}
+  <div style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;min-width:0;transition:transform .2s;">
+    <div style="position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;filter:blur(28px);opacity:.22;background:#ff6b35;pointer-events:none;"></div>
+    <span style="font-size:18px;margin-bottom:8px;display:block;">🏢</span>
+    <div style="font-size:1.9rem;font-weight:800;line-height:1;letter-spacing:-.02em;font-family:'Outfit',sans-serif;margin-bottom:4px;color:#ff6b35;">{{ stats.total_orgs }}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Organisations</div>
+  </div>
+  {% endif %}
+
+</div>
+
+
+<!-- QUOTA DETAIL PANEL (org admin only) -->
+{% if user.role != 'super_admin' and user.org %}
+<div class="quota-card">
+  <div class="quota-org-name">
+    <i class="bi bi-building" style="color:#a78bfa;"></i>
+    Quota — {{ user.org.name }}
+    <span style="font-size:10px;font-weight:600;padding:2px 10px;border-radius:12px;background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);text-transform:uppercase;letter-spacing:.06em;margin-left:4px;">{{ user.org.plan_type }}</span>
+  </div>
+
+  {% with used=user.org.calls_used total=user.org.call_quota %}
+  {% widthratio used total 100 as cpct %}
+  <div class="quota-row">
+    <div class="quota-meta">
+      <span>📞 Calls Used <span class="quota-pct-tag" style="background:{% if used >= total %}rgba(248,113,113,.12){% elif cpct >= 80 %}rgba(251,191,36,.1){% else %}rgba(52,211,153,.1){% endif %};color:{% if used >= total %}#f87171{% elif cpct >= 80 %}#fbbf24{% else %}#34d399{% endif %};border:1px solid {% if used >= total %}rgba(248,113,113,.3){% elif cpct >= 80 %}rgba(251,191,36,.25){% else %}rgba(52,211,153,.2){% endif %};">{{ cpct }}%</span></span>
+      <span style="color:{% if used >= total %}#f87171{% elif cpct >= 80 %}#fbbf24{% else %}#fff{% endif %};">{{ used }} / {{ total }}</span>
+    </div>
+    <div style="height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:{{ cpct }}%;background:{% if used >= total %}#f87171{% elif cpct >= 80 %}#fbbf24{% else %}#34d399{% endif %};border-radius:4px;transition:width .8s ease;"></div>
+    </div>
+    {% if used >= total %}<div style="font-size:11px;color:#f87171;margin-top:5px;font-weight:600;">⛔ Quota exhausted — calls are blocked until reset by admin</div>{% endif %}
+  </div>
+  {% endwith %}
+
+  {% with used=user.org.minutes_used total=user.org.minutes_quota %}
+  {% widthratio used total 100 as mpct %}
+  <div class="quota-row">
+    <div class="quota-meta">
+      <span>⏱️ Minutes Used <span class="quota-pct-tag" style="background:{% if used >= total %}rgba(248,113,113,.12){% elif mpct >= 80 %}rgba(251,191,36,.1){% else %}rgba(0,229,255,.08){% endif %};color:{% if used >= total %}#f87171{% elif mpct >= 80 %}#fbbf24{% else %}var(--cyan){% endif %};border:1px solid {% if used >= total %}rgba(248,113,113,.3){% elif mpct >= 80 %}rgba(251,191,36,.25){% else %}rgba(0,229,255,.2){% endif %};">{{ mpct }}%</span></span>
+      <span style="color:{% if used >= total %}#f87171{% elif mpct >= 80 %}#fbbf24{% else %}#fff{% endif %};">{{ used }} / {{ total }}</span>
+    </div>
+    <div style="height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:{{ mpct }}%;background:{% if used >= total %}#f87171{% elif mpct >= 80 %}#fbbf24{% else %}var(--cyan){% endif %};border-radius:4px;transition:width .8s ease;"></div>
+    </div>
+    {% if used >= total %}<div style="font-size:11px;color:#f87171;margin-top:5px;font-weight:600;">⛔ Minutes quota exhausted</div>{% endif %}
+  </div>
+  {% endwith %}
+
+  {% with used=stats.allowed_numbers total=stats.number_quota %}
+  {% widthratio used total 100 as npct %}
+  <div class="quota-row" style="margin-bottom:0;">
+    <div class="quota-meta">
+      <span>📱 Phone Numbers <span class="quota-pct-tag" style="background:{% if used >= total %}rgba(248,113,113,.12){% else %}rgba(167,139,250,.1){% endif %};color:{% if used >= total %}#f87171{% else %}#a78bfa{% endif %};border:1px solid {% if used >= total %}rgba(248,113,113,.3){% else %}rgba(167,139,250,.2){% endif %};">{{ npct }}%</span></span>
+      <span style="color:{% if used >= total %}#f87171{% else %}#fff{% endif %};">{{ used }} / {{ total }}</span>
+    </div>
+    <div style="height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;">
+      <div style="height:100%;width:{{ npct }}%;background:{% if used >= total %}#f87171{% else %}#a78bfa{% endif %};border-radius:4px;transition:width .8s ease;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:5px;">
+      {% if used >= total %}<span style="color:#f87171;font-weight:700;">⛔ Cannot add more numbers</span> — {% endif %}<a href="{% url 'numbers_page' %}" style="color:var(--cyan);text-decoration:none;font-weight:600;">Manage Numbers →</a>
+    </div>
+  </div>
+  {% endwith %}
+
+</div>
+{% endif %}
+<!-- ══════════════════════════════
+     ROW: SENTIMENT + LEAD TEMP
+══════════════════════════════ -->
+<div class="dash-grid-2">
+
+  <!-- Sentiment Breakdown -->
+  <div class="panel-card">
+    <div class="section-head">😊 Sentiment Breakdown</div>
+
+    <div class="sent-row">
+      <div class="sent-dot" style="background:#4ade80;"></div>
+      <span class="sent-label">Positive</span>
+      <div class="sent-track">
+        <div class="sent-fill" style="width:{{ stats.positive_pct }}%; background:#4ade80;"></div>
+      </div>
+      <span class="sent-pct" style="color:#4ade80;">{{ stats.positive_pct }}%</span>
+    </div>
+
+    <div class="sent-row">
+      <div class="sent-dot" style="background:#fbbf24;"></div>
+      <span class="sent-label">Neutral</span>
+      <div class="sent-track">
+        <div class="sent-fill" style="width:{{ stats.neutral_pct }}%; background:#fbbf24;"></div>
+      </div>
+      <span class="sent-pct" style="color:#fbbf24;">{{ stats.neutral_pct }}%</span>
+    </div>
+
+    <div class="sent-row">
+      <div class="sent-dot" style="background:#f87171;"></div>
+      <span class="sent-label">Negative</span>
+      <div class="sent-track">
+        <div class="sent-fill" style="width:{{ stats.negative_pct }}%; background:#f87171;"></div>
+      </div>
+      <span class="sent-pct" style="color:#f87171;">{{ stats.negative_pct }}%</span>
+    </div>
+
+    <div style="margin-top:18px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex; gap:20px;">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Avg Score</div>
+          <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:{% if stats.avg_sentiment >= 0 %}#4ade80{% else %}#f87171{% endif %};">
+            {% if stats.avg_sentiment >= 0 %}+{% endif %}{{ stats.avg_sentiment|default:"0.00" }}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Analysed</div>
+          <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--cyan);">
+            {{ stats.total_calls }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lead Temperature -->
+  <div class="panel-card">
+    <div class="section-head">🌡️ Lead Temperature</div>
+
+    <div class="temp-grid">
+      <div class="temp-box temp-hot">
+        <div class="tv" style="color:#f87171;">{{ stats.hot_leads|default:"0" }}</div>
+        <div class="tl" style="color:#f87171;">🔥 Hot</div>
+      </div>
+      <div class="temp-box temp-warm">
+        <div class="tv" style="color:#fbbf24;">{{ stats.warm_leads|default:"0" }}</div>
+        <div class="tl" style="color:#fbbf24;">☀️ Warm</div>
+      </div>
+      <div class="temp-box temp-cold">
+        <div class="tv" style="color:var(--cyan);">{{ stats.cold_leads|default:"0" }}</div>
+        <div class="tl" style="color:var(--cyan);">❄️ Cold</div>
+      </div>
+    </div>
+
+    <div class="score-wrap">
+      <div class="score-meta"><span>Hot avg score</span><span style="color:#f87171;">0 / 100</span></div>
+      <div class="score-track"><div class="score-fill" style="width:0%;background:#f87171;"></div></div>
+    </div>
+    <div class="score-wrap">
+      <div class="score-meta"><span>Warm avg score</span><span style="color:#fbbf24;">0 / 100</span></div>
+      <div class="score-track"><div class="score-fill" style="width:0%;background:#fbbf24;"></div></div>
+    </div>
+    <div class="score-wrap">
+      <div class="score-meta"><span>Cold avg score</span><span style="color:var(--cyan);">0 / 100</span></div>
+      <div class="score-track"><div class="score-fill" style="width:0%;background:var(--cyan);"></div></div>
+    </div>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Avg Conv. Probability (Sales)</div>
+      <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--green);">
+        {{ stats.avg_conv_prob|default:"0" }}%
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════
+     ROW: FUNNEL + INTENT + OUTCOMES
+══════════════════════════════ -->
+<div class="dash-grid-3">
+
+  <!-- Call Conversion Funnel -->
+  <div class="panel-card">
+    <div class="section-head">📊 Conversion Funnel</div>
+
+    {% with total=stats.total_calls %}
+
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Total Calls</span><span style="color:var(--cyan);font-weight:700;">{{ total }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:100%;background:linear-gradient(90deg,var(--cyan),rgba(0,229,255,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--cyan);">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Leads</span><span style="color:var(--purple);font-weight:700;">{{ stats.total_leads }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:{% if total %}{% widthratio stats.total_leads total 100 %}{% else %}0{% endif %}%;background:linear-gradient(90deg,var(--purple),rgba(139,92,246,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--purple);">{% if total %}{% widthratio stats.total_leads total 100 %}{% else %}0{% endif %}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Customers</span><span style="color:var(--green);font-weight:700;">{{ stats.total_customers }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:{% if total %}{% widthratio stats.total_customers total 100 %}{% else %}0{% endif %}%;background:linear-gradient(90deg,var(--green),rgba(74,222,128,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--green);">{% if total %}{% widthratio stats.total_customers total 100 %}{% else %}0{% endif %}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Open Tickets</span><span style="color:var(--amber);font-weight:700;">{{ stats.open_tickets }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:{% if total %}{% widthratio stats.open_tickets total 100 %}{% else %}0{% endif %}%;background:linear-gradient(90deg,var(--amber),rgba(251,191,36,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--amber);">{% if total %}{% widthratio stats.open_tickets total 100 %}{% else %}0{% endif %}%</span>
+        </div>
+      </div>
+    </div>
+
+    {% endwith %}
+  </div>
+
+  <!-- Intent Distribution -->
+  <div class="panel-card">
+    <div class="section-head">🎯 Intent & Objections</div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Top intents</div>
+      <div class="intent-row">
+        <span>Purchase inquiry</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:42%;background:#378add;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">42%</span>
+        </div>
+      </div>
+      <div class="intent-row">
+        <span>Demo request</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:25%;background:#7f77dd;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">25%</span>
+        </div>
+      </div>
+      <div class="intent-row">
+        <span>Complaint</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:18%;background:#e24b4a;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">18%</span>
+        </div>
+      </div>
+      <div class="intent-row">
+        <span>Pricing query</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:15%;background:#ba7517;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">15%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Top objections</div>
+    <span class="tag tag-objection">Too expensive</span>
+    <span class="tag tag-objection">Need approval</span>
+    <span class="tag tag-objection">Already using X</span>
+    <span class="tag tag-objection">Not right time</span>
+  </div>
+
+  <!-- Call Outcomes + Buying Signals -->
+  <div class="panel-card">
+    <div class="section-head">✅ Outcomes & Signals</div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Call outcomes</div>
+      <div class="outcome-row">
+        <span>Converted</span>
+        <span class="outcome-pill" style="background:rgba(74,222,128,0.12);color:#4ade80;">{{ stats.converted_count|default:"0" }}</span>
+      </div>
+      <div class="outcome-row">
+        <span>Follow-up scheduled</span>
+        <span class="outcome-pill" style="background:rgba(0,229,255,0.1);color:var(--cyan);">{{ stats.followup_count|default:"0" }}</span>
+      </div>
+      <div class="outcome-row">
+        <span>Not interested</span>
+        <span class="outcome-pill" style="background:rgba(239,68,68,0.1);color:#f87171;">{{ stats.not_interested_count|default:"0" }}</span>
+      </div>
+      <div class="outcome-row">
+        <span>Ticket raised</span>
+        <span class="outcome-pill" style="background:rgba(251,191,36,0.1);color:#fbbf24;">{{ stats.open_tickets }}</span>
+      </div>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Buying signals</div>
+    <span class="tag tag-signal">Sounds good</span>
+    <span class="tag tag-signal">Tell me more</span>
+    <span class="tag tag-signal">What's the price?</span>
+    <span class="tag tag-signal">When can we start?</span>
+
+    <div style="margin-top:12px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Top keywords</div>
+      <span class="tag tag-keyword">Pricing</span>
+      <span class="tag tag-keyword">Demo</span>
+      <span class="tag tag-keyword">Discount</span>
+      <span class="tag tag-keyword">Integration</span>
+      <span class="tag tag-keyword">ROI</span>
+      <span class="tag tag-keyword">Timeline</span>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+
+<style>
+  .table { --bs-table-bg: transparent; color: var(--text); }
+  .table thead th {
+    color: var(--muted); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 700; border-color: rgba(255,255,255,0.06);
+    padding: 10px 16px;
+  }
+  .table tbody td { border-color: rgba(255,255,255,0.04); padding: 10px 16px; }
+  .table-hover > tbody > tr:hover > * { background-color: rgba(255,255,255,0.03); }
+
+  /* ══ MODAL OVERLAY ══ */
+  #callModal {
+    position: fixed; inset: 0; z-index: 9999;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(8px);
+    padding: 16px;
+  }
+  #callModal.open { display: flex; }
+
+  /* ══ MODAL CARD ══ */
+  .cm-card {
+    background: linear-gradient(145deg, #0d1b2a, #091420);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 20px;
+    width: 100%; max-width: 820px;
+    max-height: 88vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,229,255,0.06);
+    animation: cm-in 0.2s ease;
+  }
+  @keyframes cm-in {
+    from { opacity:0; transform:translateY(12px) scale(0.98); }
+    to   { opacity:1; transform:translateY(0)    scale(1);    }
+  }
+
+  .cm-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    flex-shrink: 0;
+  }
+  .cm-title {
+    font-size: 15px; font-weight: 800; color: #fff;
+    font-family: 'Outfit', sans-serif; margin: 0;
+  }
+  .cm-meta {
+    font-size: 11px; color: var(--muted); margin-top: 3px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.03em;
+  }
+  .cm-close {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    color: var(--muted); font-size: 18px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background 0.15s, color 0.15s; flex-shrink: 0;
+  }
+  .cm-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+  .cm-tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 0 20px; flex-shrink: 0;
+  }
+  .cm-tab {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted);
+    padding: 10px 16px; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .cm-tab:hover { color: #fff; }
+  .cm-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+  .cm-panel {
+    display: none; flex: 1; overflow-y: auto; padding: 18px 20px;
+    flex-direction: column; gap: 14px;
+  }
+  .cm-panel.active { display: flex; }
+
+  .cm-turns { display: flex; flex-direction: column; gap: 8px; }
+  .cm-bwrap-agent    { display: flex; justify-content: flex-start; }
+  .cm-bwrap-customer { display: flex; justify-content: flex-end; }
+  .cm-bubble {
+    max-width: 78%; padding: 9px 13px; border-radius: 14px;
+    font-size: 12px; line-height: 1.55;
+  }
+  .cm-bubble-agent {
+    background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.14);
+    color: #cce8ff; border-top-left-radius: 3px;
+  }
+  .cm-bubble-customer {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    color: #d0d8e4; border-top-right-radius: 3px;
+  }
+  .cm-bubble-spk {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.10em; opacity: 0.5; display: block; margin-bottom: 3px;
+  }
+  .cm-raw {
+    font-size: 11px; color: var(--muted); white-space: pre-wrap; line-height: 1.6;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; padding: 12px;
+  }
+  .cm-empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 40px 20px; gap: 10px; text-align: center;
+  }
+  .cm-empty-icon { font-size: 32px; }
+  .cm-empty-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  .cm-analyse-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    color: #000; border: none; border-radius: 10px;
+    padding: 10px 22px; font-size: 12px; font-weight: 800;
+    font-family: 'Outfit', sans-serif; letter-spacing: 0.05em;
+    cursor: pointer; transition: transform 0.15s, opacity 0.15s;
+    align-self: flex-start;
+  }
+  .cm-analyse-btn:hover { transform: translateY(-1px); }
+  .cm-analyse-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .cm-spinner-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 12px; padding: 40px; text-align: center;
+  }
+  .cm-spinner {
+    width: 34px; height: 34px;
+    border: 3px solid rgba(0,229,255,0.15);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: cm-spin 0.7s linear infinite;
+  }
+  @keyframes cm-spin { to { transform: rotate(360deg); } }
+  .cm-spinner-text { font-size: 12px; color: var(--muted); }
+
+  .cm-summary {
+    font-size: 12px; color: #c5d4e8; line-height: 1.65;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .cm-scores {
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+  }
+  .cm-score-box {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 12px 8px; text-align: center;
+  }
+  .cm-score-val {
+    font-size: 22px; font-weight: 800;
+    font-family: 'Outfit', sans-serif; line-height: 1;
+  }
+  .cm-score-lbl {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin-top: 4px;
+  }
+  .cm-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .cm-badge {
+    font-size: 11px; font-weight: 700; padding: 3px 12px;
+    border-radius: 20px; letter-spacing: 0.05em;
+  }
+  .cm-b-positive { background:rgba(74,222,128,0.12); color:#4ade80; border:1px solid rgba(74,222,128,0.25); }
+  .cm-b-neutral  { background:rgba(251,191,36,0.12);  color:#fbbf24; border:1px solid rgba(251,191,36,0.25); }
+  .cm-b-negative { background:rgba(248,113,113,0.12); color:#f87171; border:1px solid rgba(248,113,113,0.25); }
+  .cm-b-outcome  { background:rgba(255,255,255,0.07); color:#c5d4e8;  border:1px solid rgba(255,255,255,0.12); }
+  .cm-conv       { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-left:auto; }
+  .cm-section-lbl {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); margin-bottom: 6px;
+  }
+  .cm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cm-tag  { font-size: 11px; padding: 3px 10px; border-radius: 20px; }
+  .cm-t-signal    { background:rgba(74,222,128,0.10);  color:#4ade80; border:1px solid rgba(74,222,128,0.2); }
+  .cm-t-objection { background:rgba(248,113,113,0.10); color:#f87171; border:1px solid rgba(248,113,113,0.2); }
+  .cm-t-keyword   { background:rgba(0,229,255,0.08);   color:var(--cyan); border:1px solid rgba(0,229,255,0.15); }
+  .cm-t-entity    { background:rgba(139,92,246,0.10);  color:#c084fc; border:1px solid rgba(139,92,246,0.2); }
+  .cm-intent-pill {
+    font-size:12px; color:#c5d4e8;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+    border-radius:8px; padding:8px 12px;
+  }
+  .cm-section { display:flex; flex-direction:column; gap:6px; }
+</style>
+
+<!-- ══════════════════════════════════════════════════
+     CALL MODAL
+══════════════════════════════════════════════════ -->
+<div id="callModal">
+  <div class="cm-card">
+
+    <div class="cm-header">
+      <div>
+        <div class="cm-title" id="cm-contact">Loading…</div>
+        <div class="cm-meta"  id="cm-meta"></div>
+      </div>
+      <button class="cm-close" onclick="closeCallModal()">×</button>
+    </div>
+
+    <div class="cm-tabs">
+      <div class="cm-tab active" id="cm-tab-transcript" onclick="cmSwitchTab('transcript')">📄 Transcript</div>
+      <div class="cm-tab" id="cm-tab-analysis"   onclick="cmSwitchTab('analysis')">🔍 Analysis</div>
+      <div class="cm-tab" id="cm-tab-manual"     onclick="cmSwitchTab('manual')">📋 Analyse Text</div>
+    </div>
+
+    <!-- Panel: Transcript -->
+    <div class="cm-panel active" id="cm-panel-transcript">
+      <div class="cm-turns"       id="cm-turns"></div>
+      <pre class="cm-raw"         id="cm-raw"   style="display:none;"></pre>
+      <div class="cm-empty-state" id="cm-no-transcript" style="display:none;">
+        <div class="cm-empty-icon">🎙️</div>
+        <div class="cm-empty-text">No transcript available for this call.</div>
+      </div>
+    </div>
+
+    <!-- Panel: Analysis -->
+    <div class="cm-panel" id="cm-panel-analysis">
+      <div id="cm-state-pending" style="display:none;" class="cm-empty-state">
+        <div class="cm-empty-icon">⏳</div>
+        <div class="cm-empty-text">Analysis not yet run for this call.</div>
+        <button class="cm-analyse-btn" onclick="triggerAnalysis()">✦ Run Analysis</button>
+      </div>
+      <div id="cm-state-spinner" style="display:none;" class="cm-spinner-wrap">
+        <div class="cm-spinner"></div>
+        <div class="cm-spinner-text">Running AI analysis… this takes a few seconds</div>
+      </div>
+      <div id="cm-results" style="display:none; flex-direction:column; gap:14px;">
+        <div class="cm-section">
+          <div class="cm-section-lbl">Summary</div>
+          <div class="cm-summary" id="cm-r-summary"></div>
+        </div>
+        <div class="cm-scores">
+          <div class="cm-score-box">
+            <div class="cm-score-val" id="cm-r-overall" style="color:var(--cyan);">—</div>
+            <div class="cm-score-lbl">Overall</div>
+          </div>
+          <div class="cm-score-box">
+            <div class="cm-score-val" id="cm-r-leadscore" style="color:var(--green);">—</div>
+            <div class="cm-score-lbl">Lead Score</div>
+          </div>
+          <div class="cm-score-box">
+            <div class="cm-score-val" id="cm-r-temp">—</div>
+            <div class="cm-score-lbl">Temperature</div>
+          </div>
+        </div>
+        <div class="cm-row">
+          <span id="cm-r-sentiment" class="cm-badge cm-b-neutral">—</span>
+          <span id="cm-r-outcome"   class="cm-badge cm-b-outcome">—</span>
+          <span id="cm-r-convprob"  class="cm-conv" style="display:none;"></span>
+        </div>
+        <div class="cm-section" id="cm-wrap-intent" style="display:none;">
+          <div class="cm-section-lbl">Intent</div>
+          <div class="cm-intent-pill" id="cm-r-intent"></div>
+        </div>
+        <div class="cm-section" id="cm-wrap-signals" style="display:none;">
+          <div class="cm-section-lbl">Buying Signals</div>
+          <div class="cm-tags" id="cm-r-signals"></div>
+        </div>
+        <div class="cm-section" id="cm-wrap-objections" style="display:none;">
+          <div class="cm-section-lbl">Objections</div>
+          <div class="cm-tags" id="cm-r-objections"></div>
+        </div>
+        <div class="cm-section" id="cm-wrap-keywords" style="display:none;">
+          <div class="cm-section-lbl">Keywords</div>
+          <div class="cm-tags" id="cm-r-keywords"></div>
+        </div>
+        <div class="cm-section" id="cm-wrap-entities" style="display:none;">
+          <div class="cm-section-lbl">Entities</div>
+          <div class="cm-tags" id="cm-r-entities"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Manual Transcript -->
+    <div class="cm-panel" id="cm-panel-manual">
+      <div id="manual-slots" style="display:flex; flex-direction:column; gap:12px;"></div>
+      <button id="manual-add-btn" onclick="manualAddSlot()"
+        style="align-self:flex-start; margin-top:4px;
+               background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+               color:var(--muted); border-radius:10px; padding:7px 16px;
+               font-size:11px; font-weight:700; cursor:pointer; letter-spacing:0.06em;
+               font-family:'Outfit',sans-serif; transition:color 0.15s, border-color 0.15s;">
+        + Add Transcript (max 5)
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   MODAL CORE
+══════════════════════════════════════════════════════ */
+let _callId = null;
+
+function openCallModal(callId) {
+  _callId = callId;
+  document.getElementById('callModal').classList.add('open');
+  cmSwitchTab('transcript');
+  _resetModal();
+  fetch(`/api/call/${callId}/modal/`)
+    .then(r => r.json())
+    .then(_populate)
+    .catch(() => _q('cm-contact').textContent = 'Failed to load');
+}
+
+function closeCallModal() {
+  document.getElementById('callModal').classList.remove('open');
+  _callId = null;
+}
+document.getElementById('callModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('callModal')) closeCallModal();
+});
+
+function cmSwitchTab(tab) {
+  ['transcript', 'analysis', 'manual'].forEach(t => {
+    _q(`cm-tab-${t}`).classList.toggle('active', t === tab);
+    _q(`cm-panel-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'manual') _manualInit();
+}
+
+function _resetModal() {
+  _q('cm-contact').textContent = 'Loading…';
+  _q('cm-meta').textContent    = '';
+  _q('cm-turns').innerHTML     = '';
+  _hide('cm-raw');
+  _hide('cm-no-transcript');
+  _hide('cm-state-pending');
+  _hide('cm-state-spinner');
+  _hide('cm-results');
+}
+
+function _populate(d) {
+  const dur  = d.duration_seconds ? `${Math.round(d.duration_seconds / 60)}m` : '';
+  const date = d.started_at
+    ? new Date(d.started_at).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+    : '';
+  _q('cm-contact').textContent = d.contact_name || 'Unknown';
+  _q('cm-meta').textContent    = [d.call_type?.toUpperCase(), dur, date].filter(Boolean).join(' · ');
+
+  const turns = d.transcript?.turns || [];
+  if (turns.length) {
+    const box = _q('cm-turns');
+    turns.forEach(t => {
+      const isAgent = t.speaker === 'agent';
+      const wrap = document.createElement('div');
+      wrap.className = isAgent ? 'cm-bwrap-agent' : 'cm-bwrap-customer';
+      wrap.innerHTML = `<div class="cm-bubble ${isAgent ? 'cm-bubble-agent' : 'cm-bubble-customer'}">
+        <span class="cm-bubble-spk">${_e(t.speaker)}</span>${_e(t.text)}</div>`;
+      box.appendChild(wrap);
+    });
+  } else if (d.transcript?.full_text) {
+    _q('cm-raw').textContent = d.transcript.full_text;
+    _show('cm-raw');
+  } else {
+    _show('cm-no-transcript');
+  }
+
+  if (!d || !d.analysed) {
+    _show('cm-state-pending');
+  } else {
+    _renderAnalysis(d.analysis);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ANALYSIS
+══════════════════════════════════════════════════════ */
+function _renderAnalysis(a) {
+  const kpi = a.extra_kpi || {};
+  _hide('cm-state-pending');
+  _hide('cm-state-spinner');
+  _q('cm-results').style.display = 'flex';
+
+  _q('cm-r-summary').textContent   = a.summary || '—';
+  _q('cm-r-overall').textContent   = kpi.overall_score  != null ? kpi.overall_score  + '/10'  : '—';
+  _q('cm-r-leadscore').textContent = kpi.lead_score     != null ? kpi.lead_score     + '/100' : '—';
+
+  const temp   = (kpi.temperature || '').toLowerCase();
+  const tempEl = _q('cm-r-temp');
+  tempEl.textContent = temp ? temp[0].toUpperCase() + temp.slice(1) : '—';
+  tempEl.style.color = temp==='hot' ? '#f87171' : temp==='warm' ? '#fbbf24' : temp==='cold' ? 'var(--cyan)' : 'var(--muted)';
+
+  const sent   = (a.sentiment || '').toLowerCase();
+  const sentEl = _q('cm-r-sentiment');
+  sentEl.textContent = sent || '—';
+  sentEl.className   = 'cm-badge ' + (sent==='positive' ? 'cm-b-positive' : sent==='negative' ? 'cm-b-negative' : 'cm-b-neutral');
+
+  _q('cm-r-outcome').textContent = kpi.call_outcome || '—';
+
+  const cpEl = _q('cm-r-convprob');
+  if (a.conversion_probability != null) {
+    cpEl.textContent   = Math.round(a.conversion_probability * 100) + '% conv.';
+    cpEl.style.display = '';
+  } else { cpEl.style.display = 'none'; }
+
+  if (kpi.intent) { _q('cm-r-intent').textContent = kpi.intent; _show('cm-wrap-intent'); }
+  else _hide('cm-wrap-intent');
+
+  _tags('cm-r-signals',    'cm-wrap-signals',    kpi.buying_signals, 'cm-t-signal');
+  _tags('cm-r-objections', 'cm-wrap-objections', kpi.objections,     'cm-t-objection');
+  _tags('cm-r-keywords',   'cm-wrap-keywords',   a.keywords,         'cm-t-keyword');
+  _tags('cm-r-entities',   'cm-wrap-entities',   kpi.entities,       'cm-t-entity');
+}
+
+function triggerAnalysis() {
+  if (!_callId) return;
+  _hide('cm-state-pending');
+  _show('cm-state-spinner');
+  fetch(`/api/call/${_callId}/analyse/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': _csrf() }
+  })
+  .then(() => _poll(_callId, 0))
+  .catch(() => {
+    _hide('cm-state-spinner');
+    _show('cm-state-pending');
+    alert('Failed to start analysis. Check server logs.');
+  });
+}
+
+function _poll(id, n) {
+  if (n > 24) { _hide('cm-state-spinner'); alert('Still processing — refresh in a moment.'); return; }
+  setTimeout(() => {
+    fetch(`/api/call/${id}/modal/`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.analysed) { _hide('cm-state-spinner'); _renderAnalysis(d.analysis); }
+        else _poll(id, n + 1);
+      });
+  }, 500);
+}
+
+/* ══════════════════════════════════════════════════════
+   MANUAL TRANSCRIPT TAB
+══════════════════════════════════════════════════════ */
+const MAX_MANUAL = 5;
+let _manualInited = false;
+
+function _manualInit() {
+  if (_manualInited) return;
+  _manualInited = true;
+  const saved = _manualLoad();
+  const seeds = saved.length ? saved : [{ id: _uid(), title: 'Transcript 1', text: '', result: null }];
+  seeds.forEach(_manualRenderSlot);
+  _manualUpdateAddBtn();
+}
+
+function manualAddSlot() {
+  const slots = document.querySelectorAll('.manual-slot');
+  if (slots.length >= MAX_MANUAL) return;
+  const n = slots.length + 1;
+  _manualRenderSlot({ id: _uid(), title: `Transcript ${n}`, text: '', result: null });
+  _manualSave();
+  _manualUpdateAddBtn();
+}
+
+function _manualRenderSlot({ id, title, text, result }) {
+  const container = document.getElementById('manual-slots');
+  const div = document.createElement('div');
+  div.className = 'manual-slot';
+  div.dataset.id = id;
+  div.innerHTML = `
+    <div class="manual-slot-header">
+      <input class="manual-slot-title" value="${_e(title)}"
+        placeholder="Label e.g. Call 1"
+        oninput="_manualSave()" />
+      <button class="manual-slot-remove" onclick="_manualRemove('${id}')">✕ Remove</button>
+    </div>
+    <textarea class="manual-slot-body"
+      placeholder="Paste transcript here…"
+      oninput="_manualSave()">${_e(text)}</textarea>
+    <div class="manual-slot-footer">
+      <button class="manual-analyse-btn" onclick="_manualAnalyse('${id}')">🔍 Analyse</button>
+      <span class="manual-slot-status" id="mstatus-${id}"></span>
+    </div>
+    <div class="manual-slot-result" id="mresult-${id}">
+      ${result ? _manualFormatResult(result) : ''}
+    </div>`;
+  if (result) div.querySelector(`#mresult-${id}`).style.display = 'flex';
+  container.appendChild(div);
+}
+
+function _manualRemove(id) {
+  const el = document.querySelector(`.manual-slot[data-id="${id}"]`);
+  if (el) el.remove();
+  _manualSave();
+  _manualUpdateAddBtn();
+}
+
+async function _manualAnalyse(id) {
+  const slot     = document.querySelector(`.manual-slot[data-id="${id}"]`);
+  const text     = slot.querySelector('.manual-slot-body').value.trim();
+  const statusEl = document.getElementById(`mstatus-${id}`);
+  const resultEl = document.getElementById(`mresult-${id}`);
+  const btn      = slot.querySelector('.manual-analyse-btn');
+
+  if (!text) {
+    statusEl.textContent = '⚠️ Paste a transcript first.';
+    statusEl.style.color = 'var(--amber)';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Analysing…';
+  statusEl.textContent = 'Running analysis…';
+  statusEl.style.color = 'var(--muted)';
+  resultEl.style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/analyse-text/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _csrf() },
+      body: JSON.stringify({ text, call_type: 'sales' })
+    });
+    const data = await resp.json();
+    if (data.analysed && data.analysis) {
+      resultEl.innerHTML     = _manualFormatResult(data.analysis);
+      resultEl.style.display = 'flex';
+      statusEl.textContent   = '✅ Done!';
+      statusEl.style.color   = 'var(--green)';
+      _manualSave();
+    } else {
+      statusEl.textContent = `❌ ${data.error || 'Analysis failed'}`;
+      statusEl.style.color = '#f87171';
+    }
+  } catch (err) {
+    statusEl.textContent = `❌ Request failed: ${err.message}`;
+    statusEl.style.color = '#f87171';
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '🔍 Analyse';
+  }
+}
+
+function _manualFormatResult(a) {
+  const kpi = a.extra_kpi || {};
+  const sent = (a.sentiment || 'neutral').toLowerCase();
+  const sentColor = sent === 'positive' ? '#4ade80' : sent === 'negative' ? '#f87171' : '#fbbf24';
+  const temp = (kpi.temperature || '').toLowerCase();
+  const tempColor = temp === 'hot' ? '#f87171' : temp === 'warm' ? '#fbbf24' : 'var(--cyan)';
+  const rows = [
+    ['Sentiment',  `<span style="color:${sentColor};font-weight:700;">${_e(a.sentiment || '—')}</span>`],
+    ['Temperature',`<span style="color:${tempColor};font-weight:700;">${_e(kpi.temperature || '—')}</span>`],
+    ['Lead Score', `<span style="color:var(--green);">${kpi.lead_score ?? '—'}/100</span>`],
+    ['Overall',    `<span style="color:var(--cyan);">${kpi.overall_score ?? '—'}/10</span>`],
+    ['Outcome',    _e(kpi.call_outcome || '—')],
+    ['Conv. Prob', a.conversion_probability != null ? Math.round(a.conversion_probability * 100) + '%' : '—'],
+    ['Intent',     _e(kpi.intent || '—')],
+    ['Summary',    `<span style="color:#c5d4e8;">${_e(a.summary || '—')}</span>`],
+  ];
+  return rows.map(([k, v]) => `
+    <div class="manual-result-row">
+      <span class="manual-result-key">${k}</span>
+      <span class="manual-result-value">${v}</span>
+    </div>`).join('');
+}
+
+function _manualSave() {
+  const slots = [...document.querySelectorAll('.manual-slot')];
+  const data  = slots.map(slot => {
+    const id = slot.dataset.id;
+    return {
+      id,
+      title: slot.querySelector('.manual-slot-title').value,
+      text:  slot.querySelector('.manual-slot-body').value,
+      result: null
+    };
+  });
+  try { localStorage.setItem('aos_manual_transcripts', JSON.stringify(data)); } catch(e) {}
+}
+
+function _manualLoad() {
+  try { return JSON.parse(localStorage.getItem('aos_manual_transcripts') || '[]'); }
+  catch(e) { return []; }
+}
+
+function _manualUpdateAddBtn() {
+  const count = document.querySelectorAll('.manual-slot').length;
+  const btn   = document.getElementById('manual-add-btn');
+  btn.disabled      = count >= MAX_MANUAL;
+  btn.style.opacity = count >= MAX_MANUAL ? '0.4' : '1';
+  btn.textContent   = count >= MAX_MANUAL
+    ? `Max ${MAX_MANUAL} reached`
+    : `+ Add Transcript (${count}/${MAX_MANUAL})`;
+}
+
+/* ══════════════════════════════════════════════════════
+   SHARED HELPERS
+══════════════════════════════════════════════════════ */
+function _tags(elId, wrapId, items, cls) {
+  const el  = _q(elId);
+  const arr = Array.isArray(items) ? items : (items ? [items] : []);
+  el.innerHTML = '';
+  if (!arr.length) { _hide(wrapId); return; }
+  _show(wrapId);
+  arr.forEach(i => {
+    const s = document.createElement('span');
+    s.className   = `cm-tag ${cls}`;
+    s.textContent = i;
+    el.appendChild(s);
+  });
+}
+function _q(id)    { return document.getElementById(id); }
+function _show(id) { const e = _q(id); if (e) e.style.display = ''; }
+function _hide(id) { const e = _q(id); if (e) e.style.display = 'none'; }
+function _e(s)     { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _uid()    { return 'ms_' + Math.random().toString(36).slice(2, 9); }
+function _csrf() {
+  const c = document.cookie.split(';').find(x => x.trim().startsWith('csrftoken='));
+  return c ? c.split('=')[1] : '';
+}
+</script>
+
+{% endblock %}

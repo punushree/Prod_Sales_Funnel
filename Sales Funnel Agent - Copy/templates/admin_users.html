@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% block title %}User Management — AOS Agent{% endblock %}
+{% block page_title %}User Management{% endblock %}
+{% block nav_admin_users %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── KPI STRIP ── */
+  .role-strip{display:grid !important;grid-template-columns:repeat(5,1fr) !important;gap:12px;margin-bottom:22px;}
+  @media(max-width:1100px){.role-strip{grid-template-columns:repeat(3,1fr) !important;}}
+  @media(max-width:700px){.role-strip{grid-template-columns:repeat(2,1fr) !important;}}
+  .rs-card{background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;
+    padding:18px 20px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s,border-color .2s;min-width:0;}
+  .rs-card:hover,.rs-card.active-filter{transform:translateY(-2px);border-color:var(--border-hover);}
+  .rs-card.active-filter{border-color:rgba(0,229,255,.3);}
+  .rs-glow{position:absolute;top:-20px;right:-20px;width:70px;height:70px;
+    border-radius:50%;filter:blur(26px);opacity:.13;}
+  .rs-val{font-size:2rem;font-weight:800;line-height:1;letter-spacing:-.03em;}
+  .rs-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-top:5px;}
+
+  /* ── TOOLBAR ── */
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
+  .search-box{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);
+    border:1px solid var(--border);border-radius:10px;padding:9px 14px;min-width:260px;transition:border-color .15s;}
+  .search-box:focus-within{border-color:rgba(0,229,255,.3);}
+  .search-box i{color:var(--muted);font-size:14px;}
+  .search-box input{background:none;border:none;color:#e8ecf1;font-size:13px;
+    font-family:var(--font);outline:none;flex:1;}
+  .search-box input::placeholder{color:var(--muted);}
+  .new-btn{background:linear-gradient(135deg,var(--cyan),#0088FF);color:#000;border:none;
+    border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;font-family:var(--font);
+    cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+    box-shadow:0 2px 16px rgba(0,229,255,.15);transition:transform .15s;}
+  .new-btn:hover{transform:translateY(-2px);}
+
+  /* ── USER TABLE ── */
+  .table-panel{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;}
+  .thead{display:grid;grid-template-columns:2.5fr 1.3fr 1.3fr 1.3fr 80px 90px;
+    align-items:center;padding:11px 22px;background:rgba(255,255,255,.01);
+    border-bottom:1px solid var(--border);}
+  .th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);}
+  .urow{display:grid;grid-template-columns:2.5fr 1.3fr 1.3fr 1.3fr 80px 90px;
+    align-items:center;padding:13px 22px;border-bottom:1px solid rgba(255,255,255,.03);
+    transition:background .15s;}
+  @media(max-width:768px){.thead,.urow{grid-template-columns:1fr;gap:8px;}}
+  .urow:hover{background:rgba(255,255,255,.02);}
+  .urow:last-child{border-bottom:none;}
+
+  /* ── AVATAR ── */
+  .av{width:32px;height:32px;border-radius:10px;display:inline-flex;align-items:center;
+    justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
+
+  /* ── BADGES ── */
+  .bp{display:inline-flex;align-items:center;font-size:10px;font-weight:700;
+    padding:3px 10px;border-radius:20px;letter-spacing:.04em;}
+  .bp-green{background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.2);}
+  .bp-amber{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2);}
+  .bp-red{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);}
+  .bp-cyan{background:rgba(0,229,255,.08);color:var(--cyan);border:1px solid rgba(0,229,255,.18);}
+  .bp-purple{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);}
+  .bp-blue{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2);}
+
+  /* ── TOGGLE ── */
+  .toggle{position:relative;width:38px;height:21px;background:rgba(255,255,255,.08);
+    border-radius:11px;cursor:pointer;transition:background .2s;border:none;padding:0;}
+  .toggle.on{background:rgba(52,211,153,.3);}
+  .toggle .dot{position:absolute;top:3px;left:3px;width:15px;height:15px;
+    border-radius:50%;background:#fff;transition:transform .2s,background .2s;}
+  .toggle.on .dot{transform:translateX(17px);background:#34d399;}
+
+  /* ── EDIT BTN ── */
+  .edit-btn{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;
+    padding:5px 14px;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;
+    font-family:var(--font);transition:all .15s;}
+  .edit-btn:hover{background:rgba(0,229,255,.06);color:var(--cyan);border-color:rgba(0,229,255,.2);}
+
+  /* ── MODAL ── */
+  .m-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(10px);
+    z-index:500;display:none;align-items:center;justify-content:center;}
+  .m-overlay.show{display:flex;}
+  .m-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+    padding:32px;width:500px;max-width:94vw;animation:mIn .3s ease;}
+  @keyframes mIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  .m-title{font-size:18px;font-weight:800;color:#fff;margin-bottom:24px;display:flex;align-items:center;gap:10px;}
+  .m-field{margin-bottom:16px;}
+  .m-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);margin-bottom:6px;}
+  .m-input,.m-select{width:100%;background:rgba(255,255,255,.03);border:1px solid var(--border);
+    border-radius:10px;padding:11px 14px;color:#e8ecf1;font-size:14px;font-family:var(--font);
+    outline:none;transition:border-color .15s;}
+  .m-input:focus,.m-select:focus{border-color:rgba(0,229,255,.35);}
+  .m-select option{background:var(--surface);color:#e8ecf1;}
+  .m-input::placeholder{color:var(--muted);}
+  .m-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .m-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;}
+  .m-cancel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;
+    padding:10px 22px;color:#e8ecf1;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;}
+  .m-save{background:linear-gradient(135deg,var(--cyan),#0088FF);color:#000;border:none;
+    border-radius:10px;padding:10px 26px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;}
+
+  /* ── EMPTY ── */
+  .empty{text-align:center;padding:50px;color:var(--muted);}
+  .empty i{font-size:28px;display:block;margin-bottom:10px;opacity:.3;}
+
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:28px;right:28px;background:var(--card);border:1px solid var(--border);
+    border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;z-index:600;
+    display:none;animation:mIn .3s ease;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ROLE KPI STRIP -->
+<div class="role-strip" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;width:100%;box-sizing:border-box;">
+  <div class="rs-card" onclick="filterRole('super_admin')" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s;min-width:0;box-sizing:border-box;">
+    <div class="rs-glow" style="background:#a78bfa"></div>
+    <div class="rs-val" style="color:#a78bfa">{{ super_admin_count }}</div>
+    <div class="rs-label">Super Admins</div>
+  </div>
+  <div class="rs-card" onclick="filterRole('org_admin')" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s;min-width:0;box-sizing:border-box;">
+    <div class="rs-glow" style="background:var(--cyan)"></div>
+    <div class="rs-val" style="color:var(--cyan)">{{ org_admin_count }}</div>
+    <div class="rs-label">Org Admins</div>
+  </div>
+  <div class="rs-card" onclick="filterRole('team_lead')" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s;min-width:0;box-sizing:border-box;">
+    <div class="rs-glow" style="background:#34d399"></div>
+    <div class="rs-val" style="color:#34d399">{{ team_lead_count }}</div>
+    <div class="rs-label">Team Leads</div>
+  </div>
+  <div class="rs-card" onclick="filterRole('agent')" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s;min-width:0;box-sizing:border-box;">
+    <div class="rs-glow" style="background:#fbbf24"></div>
+    <div class="rs-val" style="color:#fbbf24">{{ agent_count }}</div>
+    <div class="rs-label">Agents</div>
+  </div>
+  <div class="rs-card" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;cursor:default;transition:transform .2s;min-width:0;box-sizing:border-box;">
+    <div class="rs-glow" style="background:#60a5fa"></div>
+    <div class="rs-val" style="color:#60a5fa">{{ total_number_quota|default:"—" }}</div>
+    <div class="rs-label">Number Quota</div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-box">
+    <i class="bi bi-search"></i>
+    <input type="text" id="searchInput" placeholder="Search by name or email…" oninput="searchUsers()"/>
+  </div>
+  <button class="new-btn" onclick="openAdd()"><i class="bi bi-plus-lg"></i> Add User</button>
+</div>
+
+<!-- USER TABLE -->
+<div class="table-panel">
+  <div class="thead">
+    <div class="th">Name / Email</div>
+    <div class="th">Role</div>
+    <div class="th">Organisation</div>
+    <div class="th">Team</div>
+    <div class="th">Active</div>
+    <div class="th"></div>
+  </div>
+
+  {% for u in users %}
+  <div class="urow" id="urow-{{ u.id }}" data-role="{{ u.role }}"
+       data-name="{{ u.name|lower }}" data-email="{{ u.email|lower }}">
+    <!-- NAME -->
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="av"
+        style="background:{% if u.role == 'super_admin' %}linear-gradient(135deg,#a78bfa,#7c3aed){% elif u.role == 'org_admin' %}linear-gradient(135deg,#00E5FF,#0077FF){% elif u.role == 'team_lead' %}linear-gradient(135deg,#34D399,#059669){% else %}linear-gradient(135deg,#60A5FA,#2563EB){% endif %}">
+        {{ u.name|first|upper }}
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fff;">{{ u.name }}</div>
+        <div style="font-size:11px;color:var(--muted);">{{ u.email }}</div>
+      </div>
+    </div>
+    <!-- ROLE -->
+    <div>
+      {% if u.role == 'super_admin' %}<span class="bp bp-purple">Super Admin</span>
+      {% elif u.role == 'org_admin'  %}<span class="bp bp-cyan">Org Admin</span>
+      {% elif u.role == 'team_lead'  %}<span class="bp bp-green">Team Lead</span>
+      {% else                        %}<span class="bp bp-blue">Agent</span>{% endif %}
+    </div>
+    <!-- ORG -->
+    <div style="font-size:12px;color:{% if u.org %}#e8ecf1{% else %}var(--muted){% endif %};">
+      {{ u.org.name|default:"—" }}
+    </div>
+    <!-- TEAM -->
+    <div style="font-size:12px;color:{% if u.team %}#e8ecf1{% else %}var(--muted){% endif %};">
+      {{ u.team.name|default:"—" }}
+    </div>
+    <!-- ACTIVE TOGGLE -->
+    <div>
+      <button class="toggle {% if u.is_active %}on{% endif %}"
+        id="tog-{{ u.id }}"
+        onclick="toggleActive('{{ u.id }}',this)"
+        title="{% if u.is_active %}Click to deactivate{% else %}Click to activate{% endif %}">
+        <span class="dot"></span>
+      </button>
+    </div>
+    <!-- EDIT -->
+    <div>
+      <button class="edit-btn"
+        onclick="openEdit('{{ u.id }}','{{ u.name|escapejs }}','{{ u.email|escapejs }}','{{ u.role }}','{{ u.org_id|default:'' }}','{{ u.team_id|default:'' }}')">
+        Edit
+      </button>
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty"><i class="bi bi-people"></i>No users found</div>
+  {% endfor %}
+</div>
+
+<!-- ══ ADD USER MODAL ══ -->
+<div class="m-overlay" id="addModal">
+  <div class="m-box">
+    <div class="m-title"><i class="bi bi-person-plus-fill" style="color:var(--cyan)"></i> Add New User</div>
+    <div class="m-field">
+      <label class="m-label">Full Name *</label>
+      <input type="text" class="m-input" id="a-name" placeholder="e.g. Priya Shah"/>
+    </div>
+    <div class="m-2">
+      <div class="m-field">
+        <label class="m-label">Email *</label>
+        <input type="email" class="m-input" id="a-email" placeholder="priya@company.com"/>
+      </div>
+      <div class="m-field">
+        <label class="m-label">Password *</label>
+        <input type="password" class="m-input" id="a-pass" placeholder="Min 8 characters"/>
+      </div>
+    </div>
+    <div class="m-2">
+      <div class="m-field">
+        <label class="m-label">Role</label>
+        <select class="m-select" id="a-role">
+          <option value="agent">Agent</option>
+          <option value="team_lead">Team Lead</option>
+          <option value="org_admin">Org Admin</option>
+          <option value="super_admin">Super Admin</option>
+        </select>
+      </div>
+      <div class="m-field">
+        <label class="m-label">Organisation</label>
+        <select class="m-select" id="a-org">
+          <option value="">— None —</option>
+          {% for o in orgs %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="m-field">
+      <label class="m-label">Team</label>
+      <select class="m-select" id="a-team">
+        <option value="">— None —</option>
+        {% for t in teams %}<option value="{{ t.id }}">{{ t.name }} ({{ t.org.name }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="m-actions">
+      <button class="m-cancel" onclick="closeAll()">Cancel</button>
+      <button class="m-save" onclick="createUser()">Create User</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT USER MODAL ══ -->
+<div class="m-overlay" id="editModal">
+  <div class="m-box">
+    <div class="m-title"><i class="bi bi-pencil-square" style="color:#fbbf24"></i> Edit User</div>
+    <input type="hidden" id="e-id"/>
+    <div class="m-field">
+      <label class="m-label">Full Name</label>
+      <input type="text" class="m-input" id="e-name"/>
+    </div>
+    <div class="m-2">
+      <div class="m-field">
+        <label class="m-label">Role</label>
+        <select class="m-select" id="e-role">
+          <option value="agent">Agent</option>
+          <option value="team_lead">Team Lead</option>
+          <option value="org_admin">Org Admin</option>
+          <option value="super_admin">Super Admin</option>
+        </select>
+      </div>
+      <div class="m-field">
+        <label class="m-label">Organisation</label>
+        <select class="m-select" id="e-org">
+          <option value="">— None —</option>
+          {% for o in orgs %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="m-field">
+      <label class="m-label">Team</label>
+      <select class="m-select" id="e-team">
+        <option value="">— None —</option>
+        {% for t in teams %}<option value="{{ t.id }}">{{ t.name }} ({{ t.org.name }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="m-actions">
+      <button class="m-cancel" onclick="closeAll()">Cancel</button>
+      <button class="m-save" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = '{{ csrf_token }}';
+
+function showToast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderColor = color; t.style.color = color;
+  t.style.display = 'block';
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function closeAll() {
+  document.querySelectorAll('.m-overlay').forEach(m => m.classList.remove('show'));
+}
+function openAdd() { document.getElementById('addModal').classList.add('show'); }
+function openEdit(id, name, email, role, orgId, teamId) {
+  document.getElementById('e-id').value = id;
+  document.getElementById('e-name').value = name;
+  document.getElementById('e-role').value = role;
+  document.getElementById('e-org').value = orgId;
+  document.getElementById('e-team').value = teamId;
+  document.getElementById('editModal').classList.add('show');
+}
+
+function searchUsers() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.urow').forEach(r => {
+    const show = (r.dataset.name||'').includes(q) || (r.dataset.email||'').includes(q);
+    r.style.display = show ? '' : 'none';
+  });
+}
+
+function filterRole(role) {
+  document.querySelectorAll('.urow').forEach(r => {
+    r.style.display = (r.dataset.role === role) ? '' : 'none';
+  });
+  document.querySelectorAll('.rs-card').forEach(c => c.classList.remove('active-filter'));
+  event.currentTarget.classList.add('active-filter');
+}
+
+function createUser() {
+  const name = document.getElementById('a-name').value.trim();
+  const email = document.getElementById('a-email').value.trim();
+  const pass = document.getElementById('a-pass').value;
+  if (!name || !email || !pass) { showToast('Name, email and password are required', '#F87171'); return; }
+  const payload = {
+    name, email, password: pass,
+    role:    document.getElementById('a-role').value,
+    org_id:  document.getElementById('a-org').value || null,
+    team_id: document.getElementById('a-team').value || null,
+  };
+  fetch('/api/admin/user/create/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) { showToast('✅ User created!', '#34D399'); setTimeout(() => location.reload(), 800); }
+    else { showToast('❌ ' + (d.error || 'Failed'), '#F87171'); }
+  })
+  .catch(() => showToast('⚠ Network error', '#FBBF24'));
+}
+
+function saveEdit() {
+  const id = document.getElementById('e-id').value;
+  const payload = {
+    name:    document.getElementById('e-name').value.trim(),
+    role:    document.getElementById('e-role').value,
+    org_id:  document.getElementById('e-org').value || null,
+    team_id: document.getElementById('e-team').value || null,
+  };
+  fetch('/api/admin/user/' + id + '/update/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) { showToast('✅ User updated', '#34D399'); closeAll(); setTimeout(() => location.reload(), 800); }
+    else { showToast('❌ ' + (d.error || 'Failed'), '#F87171'); }
+  })
+  .catch(() => showToast('⚠ Network error', '#FBBF24'));
+}
+
+function toggleActive(uid, btn) {
+  const isOn = btn.classList.contains('on');
+  fetch('/api/admin/user/' + uid + '/update/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    body: JSON.stringify({ is_active: !isOn }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      btn.classList.toggle('on');
+      showToast(isOn ? '🔴 User deactivated' : '🟢 User activated', isOn ? '#F87171' : '#34D399');
+    } else { showToast('❌ ' + (d.error || 'Failed'), '#F87171'); }
+  })
+  .catch(() => showToast('⚠ Network error', '#FBBF24'));
+}
+
+// Close on overlay click
+document.querySelectorAll('.m-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) closeAll(); });
+});
+</script>
+{% endblock %}

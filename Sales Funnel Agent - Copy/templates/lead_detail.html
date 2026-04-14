@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.name }} — AOS Agent{% endblock %}
+{% block page_title %}Lead Detail{% endblock %}
+{% block nav_leads %}active{% endblock %}
+{% block nav_leads2 %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+  <a href="{% url 'lead_list' %}" style="font-size:12px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:4px;"><i class="bi bi-arrow-left"></i> Back to Leads</a>
+</div>
+
+<div class="dash-grid-2">
+  <div class="panel-card">
+    <div class="section-head">👤 Lead Information</div>
+    <div style="display:grid;gap:16px;">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Name</div>
+        <div style="font-size:16px;font-weight:700;color:#fff;">{{ lead.name }}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Phone</div>
+          <div style="font-family:var(--mono);font-size:14px;color:var(--cyan);">{{ lead.phone }}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Email</div>
+          <div style="font-size:14px;">{{ lead.email|default:"—" }}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Company</div>
+          <div style="font-size:14px;">{{ lead.company|default:"—" }}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Status</div>
+          {% if lead.status == 'converted' %}<span class="badge-pill badge-green">Converted</span>
+          {% elif lead.status == 'interested' %}<span class="badge-pill badge-cyan">Interested</span>
+          {% elif lead.status == 'called' %}<span class="badge-pill badge-amber">Called</span>
+          {% elif lead.status == 'not_interested' %}<span class="badge-pill badge-red">Not Interested</span>
+          {% else %}<span class="badge-pill" style="background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border);">New</span>{% endif %}
+        </div>
+      </div>
+      {% if lead.notes %}
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Notes</div>
+        <div style="font-size:13px;line-height:1.6;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;">{{ lead.notes }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="panel-card">
+    <div class="section-head">📞 Call History</div>
+    {% for call in calls %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fff;">
+          {% if call.call_type == 'sales' %}<span style="color:var(--cyan);">Sales</span>{% else %}<span style="color:var(--purple);">Service</span>{% endif %}
+          — {{ call.duration_seconds }}s
+        </div>
+        <div style="font-size:11px;color:var(--muted);">{{ call.started_at|date:"d M Y H:i" }}</div>
+      </div>
+      {% if call.analysis %}
+      <span class="badge-pill {% if call.analysis.sentiment == 'positive' %}badge-green{% elif call.analysis.sentiment == 'negative' %}badge-red{% else %}badge-amber{% endif %}">
+        {{ call.analysis.sentiment }}
+      </span>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;">No calls recorded for this lead</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

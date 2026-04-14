@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — AOS Agent{% endblock %}
+{% block page_title %}Super Admin Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── KPI GRID — matches dashboard.html exactly ── */
+  .sa-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── KPI CARD — matches .kpi-card from dashboard.html ── */
+  .sa-kpi {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .sa-kpi:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.12); }
+  .sa-kpi .glow {
+    position: absolute; top: -24px; right: -24px;
+    width: 80px; height: 80px;
+    border-radius: 50%; filter: blur(28px); opacity: 0.22; pointer-events: none;
+  }
+  .sa-kpi .icon  { font-size: 18px; margin-bottom: 8px; display: block; }
+  .sa-kpi .val   { font-size: 1.9rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-family: 'Outfit', sans-serif; margin-bottom: 4px; }
+  .sa-kpi .lbl   { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+  .sa-kpi .sub   { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  /* ── TWO-COL GRID ── */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  @media(max-width:900px){ .two-col{grid-template-columns:1fr;} }
+
+  /* ── PANEL ── */
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:18px; overflow:hidden; }
+  .panel-head { padding:18px 22px; border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center; }
+  .panel-head h3 { font-size:13px;font-weight:700;color:#fff;margin:0;
+    display:flex;align-items:center;gap:8px; }
+  .panel-head h3 i { color:var(--cyan);font-size:15px; }
+  .panel-body { padding:4px 0; }
+
+  /* ── SECTION HEADER ── */
+  .sec-head { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+    color:rgba(255,255,255,.6);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+  .sec-head::after { content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent); }
+
+  /* ── QUICK ACTIONS ── */
+  .qa-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; margin-bottom:24px; width:100%; box-sizing:border-box; }
+  .qa-card { background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:20px 22px; display:flex;align-items:center;gap:14px;
+    transition:border-color .2s,transform .2s;cursor:pointer;text-decoration:none; }
+  .qa-card:hover { border-color:rgba(0,229,255,.25);transform:translateY(-2px); }
+  .qa-icon { width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
+    justify-content:center;font-size:20px;flex-shrink:0; }
+  .qa-text .qa-title { font-size:13px;font-weight:700;color:#fff;margin-bottom:3px; }
+  .qa-text .qa-desc  { font-size:11px;color:var(--muted); }
+
+  /* ── TABLE ROWS ── */
+  .trow { display:grid;align-items:center;padding:13px 22px;
+    border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s; }
+  .trow:hover { background:rgba(255,255,255,.02); }
+  .trow:last-child { border-bottom:none; }
+  .thead { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+    color:var(--muted);padding:10px 22px;border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,.01); }
+
+  /* ── APPROVAL ROW ── */
+  .appr-row  { grid-template-columns:1fr auto auto auto; gap:12px; }
+  .appr-name { font-size:13px;font-weight:600;color:#fff; }
+  .appr-meta { font-size:11px;color:var(--muted);margin-top:2px; }
+
+  /* ── USER ROW ── */
+  .usr-row { grid-template-columns:2fr 1.2fr 1.2fr 80px; gap:10px; }
+
+  /* ── ORG ROW ── */
+  .org-row { grid-template-columns:1.5fr 1fr 1fr 1fr auto; gap:10px; }
+
+  /* ── BADGES ── */
+  .bp { display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+    padding:3px 10px;border-radius:20px;letter-spacing:.04em; }
+  .bp-green  { background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.2); }
+  .bp-amber  { background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2); }
+  .bp-red    { background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2); }
+  .bp-cyan   { background:rgba(0,229,255,.08);color:var(--cyan);border:1px solid rgba(0,229,255,.18); }
+  .bp-purple { background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2); }
+  .bp-blue   { background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2); }
+
+  /* ── ACTION BUTTONS ── */
+  .act-btn { padding:5px 13px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;
+    font-family:var(--font);border:none;transition:all .15s; }
+  .act-approve { background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25); }
+  .act-approve:hover { background:rgba(52,211,153,.22); }
+  .act-reject  { background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.22); }
+  .act-reject:hover  { background:rgba(248,113,113,.2); }
+  .act-view    { background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--border); }
+  .act-view:hover    { background:rgba(255,255,255,.08);color:#fff; }
+
+  /* ── AVATAR ── */
+  .av { width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;
+    justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0; }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align:center;padding:40px;color:var(--muted); }
+  .empty i { font-size:28px;display:block;margin-bottom:10px;opacity:.3; }
+
+  /* ── TOAST ── */
+  #toast { position:fixed;bottom:28px;right:28px;background:var(--card);
+    border:1px solid var(--border);border-radius:12px;padding:12px 20px;
+    font-size:13px;font-weight:600;z-index:600;display:none;animation:fadeUp .3s ease; }
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ── ACTIVITY DOT ── */
+  .a-dot { width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0; }
+  .act-row { display:flex;align-items:flex-start;gap:12px;padding:12px 22px;
+    border-bottom:1px solid rgba(255,255,255,.03); }
+  .act-row:last-child{border-bottom:none}
+  .act-row .act-text{flex:1;font-size:12px;color:var(--muted);line-height:1.5}
+  .act-row .act-text strong{color:#fff;font-weight:600}
+  .act-row .act-time{font-size:10px;color:rgba(255,255,255,.25);white-space:nowrap;margin-top:2px}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if pending_requests %}
+<!-- ★ Pending Org Requests -->
+<div class="card border-warning mb-4" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:12px;">
+  <div class="card-header d-flex align-items-center justify-content-between" style="background:transparent;border-color:rgba(234,179,8,.2);">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-inbox-fill text-warning"></i>
+      <strong class="text-warning">New Org Requests</strong>
+      <span class="badge bg-warning text-dark">{{ pending_requests|length }}</span>
+    </div>
+    <a href="{% url 'org_list' %}" style="color:#fbbf24;font-size:13px;">View all →</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" style="color:#e2e8f0;">
+      <thead><tr style="border-color:rgba(234,179,8,.15);">
+        <th>Org Name</th><th>Contact</th><th>Plan</th><th>Submitted</th><th></th>
+      </tr></thead>
+      <tbody>
+        {% for req in pending_requests %}
+        <tr style="border-color:rgba(255,255,255,.05);">
+          <td class="fw-semibold">{{ req.org_name }}</td>
+          <td><small>{{ req.contact_email }}</small></td>
+          <td><span class="badge bg-secondary">{{ req.plan_type }}</span></td>
+          <td><small class="text-muted">{{ req.created_at|timesince }} ago</small></td>
+          <td><a href="{% url 'org_list' %}" class="btn btn-sm btn-warning text-dark">Review</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ── KPI CARDS ── -->
+<div class="sa-kpi-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;width:100%;box-sizing:border-box;">
+  <div class="sa-kpi" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:transform 0.2s;min-width:0;box-sizing:border-box;">
+    <div class="glow" style="background:#00E5FF"></div>
+    <span class="icon" style="color:var(--cyan)">🏢</span>
+    <div class="val" style="color:var(--cyan)">{{ total_orgs }}</div>
+    <div class="lbl">Total Organisations</div>
+    <div class="sub">{{ approved_orgs }} approved &middot; {{ pending_orgs }} pending</div>
+  </div>
+  <div class="sa-kpi" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:transform 0.2s;min-width:0;box-sizing:border-box;">
+    <div class="glow" style="background:#A78BFA"></div>
+    <span class="icon" style="color:#a78bfa">👥</span>
+    <div class="val" style="color:#a78bfa">{{ total_users }}</div>
+    <div class="lbl">Total Users</div>
+    <div class="sub">{{ active_users }} active across all orgs</div>
+  </div>
+  <div class="sa-kpi" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:transform 0.2s;min-width:0;box-sizing:border-box;">
+    <div class="glow" style="background:#34D399"></div>
+    <span class="icon" style="color:#34d399">📞</span>
+    <div class="val" style="color:#34d399">{{ total_calls }}</div>
+    <div class="lbl">Total Calls</div>
+    <div class="sub">All organisations combined</div>
+  </div>
+  <div class="sa-kpi" style="background:linear-gradient(135deg,#0f1e2e,#0a1520);border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:transform 0.2s;min-width:0;box-sizing:border-box;">
+    <div class="glow" style="background:#FBBF24"></div>
+    <span class="icon" style="color:#fbbf24">⏳</span>
+    <div class="val" style="color:#fbbf24">{{ pending_orgs }}</div>
+    <div class="lbl">Pending Approvals</div>
+    <div class="sub">Awaiting your review</div>
+  </div>
+</div>
+
+<!-- ── QUICK ACTIONS ── -->
+<div class="sec-head">Quick Actions</div>
+<div class="qa-grid">
+  <a href="{% url 'org_list' %}" class="qa-card">
+    <div class="qa-icon" style="background:rgba(0,229,255,.1)">🏢</div>
+    <div class="qa-text">
+      <div class="qa-title">Manage Organisations</div>
+      <div class="qa-desc">Approve, reject and set quotas</div>
+    </div>
+  </a>
+  <a href="{% url 'admin_users' %}" class="qa-card">
+    <div class="qa-icon" style="background:rgba(167,139,250,.1)">👤</div>
+    <div class="qa-text">
+      <div class="qa-title">Manage Users</div>
+      <div class="qa-desc">Add, edit and deactivate users</div>
+    </div>
+  </a>
+  <a href="{% url 'admin_teams' %}" class="qa-card">
+    <div class="qa-icon" style="background:rgba(52,211,153,.1)">🏆</div>
+    <div class="qa-text">
+      <div class="qa-title">Manage Teams</div>
+      <div class="qa-desc">Create teams and assign members</div>
+    </div>
+  </a>
+</div>
+
+<!-- ── PENDING APPROVALS + RECENT USERS ── -->
+<div class="two-col">
+
+  <!-- PENDING APPROVALS -->
+  <div class="panel">
+    <div class="panel-head">
+      <h3><i class="bi bi-clock-fill"></i> Pending Approvals</h3>
+      {% if pending_orgs > 0 %}
+      <span class="bp bp-amber">{{ pending_orgs }} waiting</span>
+      {% endif %}
+    </div>
+    <div class="panel-body">
+      {% if pending_approval_list %}
+        {% for o in pending_approval_list %}
+        <div class="trow appr-row">
+          <div>
+            <div class="appr-name">{{ o.name }}</div>
+            <div class="appr-meta">{{ o.get_industry_display }} &middot; {{ o.plan_type|title }} &middot; Created {{ o.created_at|date:"d M Y" }}</div>
+          </div>
+          <button class="act-btn act-approve" onclick="approveOrg('{{ o.id }}','approve',this)">✓ Approve</button>
+          <button class="act-btn act-reject"  onclick="approveOrg('{{ o.id }}','reject',this)">✕ Reject</button>
+          <a href="{% url 'org_list' %}" class="act-btn act-view" style="text-decoration:none;text-align:center">Details</a>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty"><i class="bi bi-check-circle"></i>No pending approvals 🎉</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- RECENT USERS -->
+  <div class="panel">
+    <div class="panel-head">
+      <h3><i class="bi bi-person-lines-fill"></i> Recent Users</h3>
+      <a href="{% url 'admin_users' %}" style="font-size:11px;color:var(--cyan);">View all →</a>
+    </div>
+    <div class="panel-body">
+      {% if recent_users %}
+        {% for u in recent_users %}
+        <div class="trow" style="grid-template-columns:auto 1fr auto;gap:12px;">
+          <div class="av"
+            style="background:{% if u.role == 'super_admin' %}linear-gradient(135deg,#a78bfa,#7c3aed){% elif u.role == 'org_admin' %}linear-gradient(135deg,#00E5FF,#0077FF){% elif u.role == 'team_lead' %}linear-gradient(135deg,#34D399,#059669){% else %}linear-gradient(135deg,#60A5FA,#2563EB){% endif %}">
+            {{ u.name|first|upper }}
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#fff;">{{ u.name }}</div>
+            <div style="font-size:11px;color:var(--muted);">{{ u.email }} &middot; {{ u.org.name|default:"No Org" }}</div>
+          </div>
+          <span class="bp {% if u.role == 'super_admin' %}bp-purple{% elif u.role == 'org_admin' %}bp-cyan{% elif u.role == 'team_lead' %}bp-green{% else %}bp-blue{% endif %}">
+            {{ u.role|title|cut:"_" }}
+          </span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty"><i class="bi bi-people"></i>No users yet</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── ORG OVERVIEW TABLE ── -->
+<div class="sec-head">All Organisations</div>
+<div class="panel" style="margin-bottom:16px;">
+  <div class="thead org-row">
+    <div>Organisation</div><div>Industry</div><div>Users / Calls</div><div>Plan</div><div>Status</div>
+  </div>
+  {% for o in all_orgs %}
+  <div class="trow org-row">
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#fff;">{{ o.name }}</div>
+      <div style="font-size:11px;color:var(--muted);">Created {{ o.created_at|date:"d M Y" }}</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);">{{ o.get_industry_display }}</div>
+    <div style="font-size:12px;">
+      <span style="color:#fff;font-weight:600;">{{ o.user_count }}</span>
+      <span style="color:var(--muted);"> users</span> &middot;
+      <span style="color:#fff;font-weight:600;">{{ o.calls_used }}</span>
+      <span style="color:var(--muted);"> calls</span>
+    </div>
+    <div>
+      <span class="bp {% if o.plan_type == 'pro' %}bp-purple{% elif o.plan_type == 'starter' %}bp-cyan{% else %}bp-amber{% endif %}">
+        {{ o.plan_type|title }}
+      </span>
+    </div>
+    <div>
+      {% if o.is_approved %}
+        <span class="bp bp-green">✓ Live</span>
+      {% elif o.is_active %}
+        <span class="bp bp-amber">⏳ Pending</span>
+      {% else %}
+        <span class="bp bp-red">✕ Off</span>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty"><i class="bi bi-buildings"></i>No organisations yet</div>
+  {% endfor %}
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = '{{ csrf_token }}';
+
+function showToast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderColor = color; t.style.color = color;
+  t.style.display = 'block';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function approveOrg(orgId, action, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  fetch('/api/org/' + orgId + '/approve/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    body: JSON.stringify({ action }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      showToast('✅ ' + d.message, '#34D399');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast('❌ ' + (d.error || 'Failed'), '#F87171');
+      btn.disabled = false;
+    }
+  })
+  .catch(() => { showToast('⚠ Network error', '#FBBF24'); btn.disabled = false; });
+}
+</script>
+{% endblock %}

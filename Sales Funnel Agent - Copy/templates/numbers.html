@@ -1,0 +1,203 @@
+{% extends "base.html" %} {% block title %}Allowed Phone Numbers{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">📞 Allowed Phone Numbers</h4>
+    <small class="text-muted"
+      >Only numbers in this list can receive AI calls from your
+      organisation.</small
+    >
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="openAddModal()">
+    <i class="bi bi-plus-circle me-1"></i> Add Number
+  </button>
+</div>
+
+<!-- Quota bar -->
+<div class="card bg-dark border-secondary mb-4 p-3">
+  <div class="d-flex justify-content-between mb-1">
+    <small class="text-muted fw-semibold">Number Quota</small>
+    <small id="quotaText" class="text-muted">Loading…</small>
+  </div>
+  <div class="progress" style="height: 8px">
+    <div id="quotaBar" class="progress-bar bg-primary" style="width: 0%"></div>
+  </div>
+  <small class="text-muted mt-2"
+    >Calls to numbers NOT in this list will be blocked.</small
+  >
+</div>
+
+<!-- Numbers table -->
+<div class="card bg-dark border-secondary">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover mb-0">
+      <thead
+        ><tr>
+          <th>Phone Number</th><th>Label / Name</th><th>Added By</th
+          ><th>Added At</th><th>Actions</th>
+        </tr></thead
+      >
+      <tbody id="numbersTable">
+        <tr
+          ><td colspan="5" class="text-center text-muted py-3">Loading…</td></tr
+        >
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Number Modal -->
+<div class="modal fade" id="addNumberModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Add Phone Number</h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div id="addError" class="alert alert-danger d-none"></div>
+        <div class="mb-3">
+          <label class="form-label small text-muted"
+            >Phone Number * (E.164 or 10-digit Indian number)</label
+          >
+          <input
+            type="text"
+            class="form-control bg-black text-light border-secondary"
+            id="addPhone"
+            placeholder="+919876543210 or 9876543210"
+          />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted"
+            >Label / Lead Name (optional)</label
+          >
+          <input
+            type="text"
+            class="form-control bg-black text-light border-secondary"
+            id="addLabel"
+            placeholder="Rahul Sharma"
+          />
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button class="btn btn-secondary" data-bs-dismiss="modal"
+          >Cancel</button
+        >
+        <button class="btn btn-primary" onclick="addNumber()"
+          >Add Number</button
+        >
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allNumbers = [];
+  let quota = 0;
+  // ADD this line right after: let quota = 0;
+  const ORG_ID = '{{ org_id }}';
+
+  async function loadNumbers() {
+    const res = await fetch('/numbers/');
+    const data = await res.json();
+    allNumbers = data.numbers || [];
+    quota = data.quota || 0;
+
+    const used = allNumbers.length;
+    document.getElementById('quotaText').textContent =
+      `${used} / ${quota} used`;
+    const pct = quota > 0 ? Math.round((used / quota) * 100) : 0;
+    document.getElementById('quotaBar').style.width = pct + '%';
+    document.getElementById('quotaBar').className =
+      'progress-bar ' +
+      (pct >= 90 ? 'bg-danger' : pct >= 70 ? 'bg-warning' : 'bg-primary');
+
+    const tbody = document.getElementById('numbersTable');
+    if (!allNumbers.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="text-center text-muted py-4">No numbers added yet. Add a number to start making calls.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allNumbers
+      .map(
+        (n) => `
+    <tr>
+      <td class="fw-semibold font-monospace">${n.phone}</td>
+      <td class="text-muted">${n.label || '—'}</td>
+      <td class="text-muted small">${n.added_by || '—'}</td>
+      <td class="text-muted small">${new Date(n.added_at).toLocaleDateString()}</td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="removeNumber('${n.id}')">Remove</button></td>
+    </tr>
+  `
+      )
+      .join('');
+  }
+
+  function openAddModal() {
+    document.getElementById('addPhone').value = '';
+    document.getElementById('addLabel').value = '';
+    document.getElementById('addError').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('addNumberModal')).show();
+  }
+
+  async function addNumber() {
+    const phone = document.getElementById('addPhone').value.trim();
+    const label = document.getElementById('addLabel').value.trim();
+    const errEl = document.getElementById('addError');
+    errEl.classList.add('d-none');
+
+    if (!phone) {
+      errEl.textContent = 'Phone number is required.';
+      errEl.classList.remove('d-none');
+      return;
+    }
+
+    const res = await fetch('/numbers/add/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify({ phone, label, org_id: ORG_ID }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      bootstrap.Modal.getInstance(
+        document.getElementById('addNumberModal')
+      ).hide();
+      loadNumbers();
+    } else {
+      errEl.textContent = data.error || 'Error adding number.';
+      errEl.classList.remove('d-none');
+    }
+  }
+
+  async function removeNumber(id) {
+    if (!confirm('Remove this number? Calls to this number will be blocked.'))
+      return;
+    const res = await fetch(`/numbers/${id}/remove/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    });
+    const data = await res.json();
+    if (data.success) loadNumbers();
+    else alert(data.error || 'Error removing number.');
+  }
+
+  function getCookie(name) {
+    return (
+      document.cookie
+        .split(';')
+        .map((c) => c.trim())
+        .find((c) => c.startsWith(name + '='))
+        ?.split('=')[1] || ''
+    );
+  }
+
+  loadNumbers();
+</script>
+{% endblock %}

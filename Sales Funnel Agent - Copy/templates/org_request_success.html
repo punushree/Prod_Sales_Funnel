@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Request Submitted — AOS Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --cyan:   #00E5FF;
+    --blue:   #0077FF;
+    --green:  #34D399;
+    --bg:     #06090F;
+    --card:   #0F1620;
+    --border: rgba(255,255,255,0.07);
+    --text:   #E8ECF1;
+    --muted:  #5A6B80;
+    --font:   'Outfit', sans-serif;
+    --mono:   'JetBrains Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font-family: var(--font);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .bg-glow {
+    position: fixed; border-radius: 50%;
+    filter: blur(140px); opacity: 0.06; pointer-events: none;
+  }
+  .bg-glow-1 { width: 500px; height: 500px; top: -160px; left: -120px; background: var(--green); }
+  .bg-glow-2 { width: 400px; height: 400px; bottom: -140px; right: -100px; background: var(--cyan); }
+
+  .card {
+    position: relative; z-index: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 52px 48px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    animation: popIn 0.5s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.92) translateY(16px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .brand {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin-bottom: 36px;
+  }
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--cyan), var(--blue));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 900; color: #000;
+  }
+  .brand-name { font-size: 18px; font-weight: 800; color: #fff; }
+  .brand-name span { color: var(--cyan); }
+
+  .check-ring {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(52,211,153,0.1);
+    border: 2px solid rgba(52,211,153,0.3);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 28px;
+    box-shadow: 0 0 40px rgba(52,211,153,0.15);
+    animation: ringPulse 2.5s ease infinite;
+  }
+  @keyframes ringPulse {
+    0%, 100% { box-shadow: 0 0 40px rgba(52,211,153,0.15); }
+    50%       { box-shadow: 0 0 60px rgba(52,211,153,0.3); }
+  }
+  .check-ring svg {
+    width: 38px; height: 38px;
+    stroke: var(--green); fill: none;
+    stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 50;
+    stroke-dashoffset: 50;
+    animation: drawCheck 0.5s 0.3s ease forwards;
+  }
+  @keyframes drawCheck {
+    to { stroke-dashoffset: 0; }
+  }
+
+  h1 {
+    font-size: 26px; font-weight: 800;
+    color: #fff; letter-spacing: -0.03em;
+    margin-bottom: 12px;
+  }
+  .sub {
+    font-size: 14px; color: var(--muted);
+    line-height: 1.7; margin-bottom: 32px;
+  }
+  .sub strong { color: var(--text); font-weight: 700; }
+
+  .info-box {
+    background: rgba(52,211,153,0.05);
+    border: 1px solid rgba(52,211,153,0.15);
+    border-radius: 14px;
+    padding: 20px 22px;
+    text-align: left;
+    margin-bottom: 32px;
+  }
+  .info-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    font-size: 13px; color: #94a3b8;
+    margin-bottom: 12px; line-height: 1.5;
+  }
+  .info-row:last-child { margin-bottom: 0; }
+  .info-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+
+  .cred-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(0,229,255,0.08);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 7px;
+    padding: 3px 10px;
+    font-family: var(--mono);
+    font-size: 12px; color: var(--cyan);
+    font-weight: 500;
+  }
+
+  .btn-login {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--cyan), var(--blue));
+    color: #000;
+    text-decoration: none;
+    border-radius: 12px;
+    padding: 14px 40px;
+    font-size: 15px; font-weight: 800;
+    font-family: var(--font);
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(0,229,255,0.25);
+    letter-spacing: 0.01em;
+  }
+  .btn-login:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 32px rgba(0,229,255,0.35);
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+
+<div class="card">
+  <div class="brand">
+    <div class="brand-icon">A</div>
+    <div class="brand-name">AOS <span>Agent</span></div>
+  </div>
+
+  <div class="check-ring">
+    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+
+  <h1>Request Submitted!</h1>
+  <p class="sub">
+    Your access request has been received successfully.<br>
+    Our super admin will review and approve it shortly.
+  </p>
+
+  <div class="info-box">
+    <div class="info-row">
+      <span class="info-dot"></span>
+      <span>Your request is now <strong style="color:#e2e8f0;">pending review</strong> by the super admin.</span>
+    </div>
+    <div class="info-row">
+      <span class="info-dot"></span>
+      <span>Once approved, your default login password will be <span class="cred-pill">Test@123</span></span>
+    </div>
+    <div class="info-row">
+      <span class="info-dot"></span>
+      <span>Approval typically takes <strong style="color:#e2e8f0;">less than 24 hours</strong>.</span>
+    </div>
+  </div>
+
+  <a href="/login/" class="btn-login">Go to Login →</a>
+</div>
+
+</body>
+</html>

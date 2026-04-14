@@ -1,0 +1,406 @@
+{# templates/partials/call_analysis_inner.html #}
+{# Variables expected: call, analysis, temp, temp_label, temp_cls, txt_cls, badge_cls, icon #}
+
+{# ── Compute KPI scores from analysis data ── #}
+{% with
+  tone_score=analysis.extra_kpi.tone_score|default:0
+  questions_score=analysis.extra_kpi.questions_score|default:0
+  length_score=analysis.extra_kpi.length_score|default:0
+  overall=analysis.extra_kpi.overall_score|default:0
+%}
+
+{# ── Overall score block ── #}
+<div class="overall-score-block {{ temp_cls }} fade-in">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <span style="font-size:1.5rem;">{{ icon }}</span>
+      <span class="badge {{ badge_cls }} px-3 py-2" style="font-size:0.9rem; border-radius:8px;">
+        {{ temp_label }}
+      </span>
+    </div>
+    <div class="overall-big {{ txt_cls }}">{{ overall }}<span style="font-size:1.2rem; font-weight:400;">/10</span></div>
+    <div class="text-muted small mt-1">Overall Lead Score</div>
+    <div class="mt-2">
+      {% for kw in analysis.keywords %}
+        <span class="keyword-chip">{{ kw }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="text-end">
+    <div class="text-muted small mb-1">Conversion Probability</div>
+    <div style="font-size:2rem; font-weight:700; font-family:'DM Mono',monospace;" class="{{ txt_cls }}">
+      {% widthratio analysis.conversion_probability 1 100 %}%
+    </div>
+    <div class="text-muted small mt-2">
+      <i class="bi bi-clock me-1"></i>{{ call.duration_seconds }}s &nbsp;|&nbsp;
+      <i class="bi bi-telephone me-1"></i>{{ call.call_type }} · {{ call.direction }}
+    </div>
+    <div class="text-muted small mt-1">
+      <i class="bi bi-calendar me-1"></i>{{ call.started_at|date:"d M Y, H:i" }}
+    </div>
+  </div>
+</div>
+
+{# ── 3 KPI Cards ── #}
+<div class="row g-3 mb-4 fade-in">
+
+  {# KPI 1 — Communication Tone #}
+  <div class="col-md-4">
+    <div class="kpi-card">
+      <div class="score-ring-wrap">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#f0f0f0" stroke-width="8"/>
+          <circle cx="45" cy="45" r="36" fill="none"
+            stroke="{% if tone_score >= 7 %}#52c41a{% elif tone_score >= 4 %}#fa8c16{% else %}#f5222d{% endif %}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="226"
+            class="ring-fill"
+            data-target="{% widthratio tone_score 10 226 %}"
+            style="stroke-dashoffset: 226; transition: stroke-dashoffset 1.2s ease;"/>
+        </svg>
+        <div class="score-ring-center">
+          <span class="score-val">{{ tone_score }}</span>
+          <span class="score-max">/10</span>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="kpi-label">Communication</div>
+        <div style="font-size:1.1rem; font-weight:600;">
+          {% if tone_score >= 7 %}Positive Tone
+          {% elif tone_score >= 4 %}Neutral Tone
+          {% else %}Negative Tone{% endif %}
+        </div>
+        <div class="kpi-bar-track">
+          <div class="kpi-bar-fill"
+            style="width:0%; background:{% if tone_score >= 7 %}#52c41a{% elif tone_score >= 4 %}#fa8c16{% else %}#f5222d{% endif %};"
+            data-width="{% widthratio tone_score 10 100 %}">
+          </div>
+        </div>
+        <div class="kpi-desc">
+          {% if tone_score >= 7 %}Lead was receptive and engaged throughout
+          {% elif tone_score >= 4 %}Neutral — neither very positive nor negative
+          {% else %}Lead showed resistance or disinterest{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# KPI 2 — Cross Questions by Lead #}
+  <div class="col-md-4">
+    <div class="kpi-card">
+      <div class="score-ring-wrap">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#f0f0f0" stroke-width="8"/>
+          <circle cx="45" cy="45" r="36" fill="none"
+            stroke="{% if questions_score >= 7 %}#1677ff{% elif questions_score >= 4 %}#722ed1{% else %}#8c8c8c{% endif %}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="226"
+            class="ring-fill"
+            data-target="{% widthratio questions_score 10 226 %}"
+            style="stroke-dashoffset: 226; transition: stroke-dashoffset 1.2s ease 0.2s;"/>
+        </svg>
+        <div class="score-ring-center">
+          <span class="score-val">{{ questions_score }}</span>
+          <span class="score-max">/10</span>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="kpi-label">Cross Questions</div>
+        <div style="font-size:1.1rem; font-weight:600;">
+          {% if questions_score >= 7 %}High Interest
+          {% elif questions_score >= 4 %}Moderate Interest
+          {% else %}Low Interest{% endif %}
+        </div>
+        <div class="kpi-bar-track">
+          <div class="kpi-bar-fill"
+            style="width:0%; background:{% if questions_score >= 7 %}#1677ff{% elif questions_score >= 4 %}#722ed1{% else %}#8c8c8c{% endif %};"
+            data-width="{% widthratio questions_score 10 100 %}">
+          </div>
+        </div>
+        <div class="kpi-desc">
+          {% if questions_score >= 7 %}Lead asked many questions — strong buying signal
+          {% elif questions_score >= 4 %}Asked a few questions — follow up needed
+          {% else %}Very few questions — low engagement{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# KPI 3 — Length of Conversation #}
+  <div class="col-md-4">
+    <div class="kpi-card">
+      <div class="score-ring-wrap">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#f0f0f0" stroke-width="8"/>
+          <circle cx="45" cy="45" r="36" fill="none"
+            stroke="{% if length_score >= 7 %}#13c2c2{% elif length_score >= 4 %}#fa8c16{% else %}#8c8c8c{% endif %}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="226"
+            class="ring-fill"
+            data-target="{% widthratio length_score 10 226 %}"
+            style="stroke-dashoffset: 226; transition: stroke-dashoffset 1.2s ease 0.4s;"/>
+        </svg>
+        <div class="score-ring-center">
+          <span class="score-val">{{ length_score }}</span>
+          <span class="score-max">/10</span>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="kpi-label">Conversation Length</div>
+        <div style="font-size:1.1rem; font-weight:600;">
+          {% if call.duration_seconds >= 180 %}Long Call
+          {% elif call.duration_seconds >= 60 %}Medium Call
+          {% else %}Short Call{% endif %}
+          &nbsp;<span class="text-muted" style="font-size:0.85rem;">({{ call.duration_seconds }}s)</span>
+        </div>
+        <div class="kpi-bar-track">
+          <div class="kpi-bar-fill"
+            style="width:0%; background:{% if length_score >= 7 %}#13c2c2{% elif length_score >= 4 %}#fa8c16{% else %}#8c8c8c{% endif %};"
+            data-width="{% widthratio length_score 10 100 %}">
+          </div>
+        </div>
+        <div class="kpi-desc">
+          {% if call.duration_seconds >= 180 %}Long conversation — lead is seriously interested
+          {% elif call.duration_seconds >= 60 %}Average length — decent engagement
+          {% else %}Call was too short — low engagement{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── AI Summary ── #}
+{% if analysis.summary %}
+<div class="card p-4 mb-4 fade-in" style="border-left: 4px solid #1677ff; border-radius:12px;">
+  <div class="d-flex gap-2 align-items-start">
+    <i class="bi bi-robot text-primary mt-1"></i>
+    <div>
+      <div class="fw-semibold small text-muted mb-1">AI SUMMARY</div>
+      <p class="mb-0" style="font-size:0.92rem; line-height:1.6;">{{ analysis.summary }}</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Tabs ── #}
+<div class="aos-tabs fade-in">
+  <button class="aos-tab active" id="tab-call" onclick="switchTab('call')">
+    <i class="bi bi-telephone me-1"></i> Call Details
+  </button>
+  <button class="aos-tab" id="tab-ticket" onclick="switchTab('ticket')">
+    <i class="bi bi-ticket me-1"></i> Ticket Details
+    {% with ticket_count=call.tickets.count %}
+      {% if ticket_count > 0 %}
+        <span class="badge bg-danger ms-1" style="font-size:0.7rem;">{{ ticket_count }}</span>
+      {% endif %}
+    {% endwith %}
+  </button>
+</div>
+
+{# ══════════════════════════════════════════ #}
+{# TAB 1 — CALL DETAILS                       #}
+{# ══════════════════════════════════════════ #}
+<div id="panel-call" class="tab-panel fade-in">
+  <div class="row g-4">
+
+    {# Call metadata #}
+    <div class="col-md-4">
+      <div class="card p-4 h-100">
+        <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Call Info</h6>
+        <ul class="list-unstyled small mb-0">
+          <li class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted">Party</span>
+            <span class="fw-semibold">{{ call.lead|default:call.customer|default:"Unknown" }}</span>
+          </li>
+          <li class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted">Type</span>
+            <span class="badge bg-{% if call.call_type == 'sales' %}primary{% else %}success{% endif %}">{{ call.call_type }}</span>
+          </li>
+          <li class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted">Direction</span>
+            <span>{{ call.direction }}</span>
+          </li>
+          <li class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted">Duration</span>
+            <span>{{ call.duration_seconds }}s</span>
+          </li>
+          <li class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted">Status</span>
+            <span class="badge bg-{% if call.status == 'completed' %}success{% else %}secondary{% endif %}">{{ call.status }}</span>
+          </li>
+          <li class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted">Sentiment</span>
+            <span class="badge
+              {% if analysis.sentiment == 'positive' %}bg-success
+              {% elif analysis.sentiment == 'negative' %}bg-danger
+              {% else %}bg-secondary{% endif %}">
+              {{ analysis.sentiment }}
+            </span>
+          </li>
+          <li class="d-flex justify-content-between py-2">
+            <span class="text-muted">Started</span>
+            <span>{{ call.started_at|date:"d M Y, H:i" }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    {# Transcript #}
+    <div class="col-md-8">
+      <div class="card p-4 h-100">
+        <h6 class="fw-bold mb-3"><i class="bi bi-chat-text me-2 text-success"></i>Transcript</h6>
+        <div style="max-height: 460px; overflow-y: auto; padding-right: 4px;">
+          {% if call.transcript %}
+            {% if call.transcript.turns %}
+              {% for turn in call.transcript.turns %}
+              <div class="bubble-wrap {% if turn.speaker == 'customer' %}customer{% endif %}">
+                <div class="bubble {% if turn.speaker == 'agent' %}bubble-agent{% else %}bubble-customer{% endif %}">
+                  <div class="bubble-speaker">
+                    {% if turn.speaker == 'agent' %}🤖 Agent{% else %}👤 Customer{% endif %}
+                    {% if turn.timestamp %}<span class="ms-2 fw-normal text-muted">{{ turn.timestamp }}s</span>{% endif %}
+                  </div>
+                  {{ turn.text }}
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <pre style="white-space:pre-wrap; font-family:'DM Mono',monospace; font-size:0.82rem; line-height:1.7;">{{ call.transcript.full_text }}</pre>
+            {% endif %}
+          {% else %}
+            <div class="text-center text-muted py-5">
+              <i class="bi bi-chat-slash" style="font-size:2rem;"></i>
+              <p class="mt-2">No transcript available yet</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# ══════════════════════════════════════════ #}
+{# TAB 2 — TICKET DETAILS                     #}
+{# ══════════════════════════════════════════ #}
+<div id="panel-ticket" class="tab-panel fade-in" style="display:none;">
+
+  {% with tickets=call.tickets.all %}
+  {% if tickets %}
+
+    {# Ticket summary counts #}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="value text-danger">{{ tickets|length }}</div>
+          <div class="text-muted small">Total Tickets</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="value text-warning">
+            {% for t in tickets %}{% if t.status == 'open' %}x{% endif %}{% endfor %} 
+          </div>
+          <div class="text-muted small">Open</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="value text-info">
+            {% for t in tickets %}{% if t.status == 'in_progress' %}x{% endif %}{% endfor %}
+          </div>
+          <div class="text-muted small">In Progress</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="value text-success">
+            {% for t in tickets %}{% if t.status == 'resolved' %}x{% endif %}{% endfor %}
+          </div>
+          <div class="text-muted small">Resolved</div>
+        </div>
+      </div>
+    </div>
+
+    {# Individual ticket cards #}
+    {% for ticket in tickets %}
+    <div class="ticket-card {{ ticket.status }}">
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-secondary">{{ ticket.issue_type }}</span>
+            <span class="badge
+              {% if ticket.status == 'open' %}bg-danger
+              {% elif ticket.status == 'in_progress' %}bg-warning text-dark
+              {% elif ticket.status == 'resolved' %}bg-success
+              {% else %}bg-secondary{% endif %}">
+              {{ ticket.get_status_display }}
+            </span>
+          </div>
+          <div class="fw-semibold">{{ ticket.customer.name }}</div>
+          <div class="text-muted small">{{ ticket.customer.phone }}</div>
+        </div>
+        <div class="text-end">
+          <div class="text-muted small">Created</div>
+          <div class="small fw-semibold">{{ ticket.created_at|date:"d M Y, H:i" }}</div>
+          {% if ticket.resolved_at %}
+          <div class="text-muted small mt-1">Resolved</div>
+          <div class="small fw-semibold text-success">{{ ticket.resolved_at|date:"d M Y, H:i" }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mb-3 p-3 rounded" style="background:#f9f9fb; font-size:0.88rem; line-height:1.6;">
+        {{ ticket.description }}
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="small text-muted">
+          {% if ticket.assigned_to %}
+            <i class="bi bi-person-check me-1"></i>Assigned to: <strong>{{ ticket.assigned_to }}</strong>
+          {% else %}
+            <i class="bi bi-person-dash me-1"></i><span class="text-danger">Unassigned</span>
+          {% endif %}
+        </div>
+        {# Update status inline #}
+        <form method="post" action="{% url 'ticket_update' ticket.id %}" class="d-flex gap-2 align-items-center">
+          {% csrf_token %}
+          <select name="status" class="form-select form-select-sm" style="width:130px;">
+            <option value="open"        {% if ticket.status == 'open' %}selected{% endif %}>Open</option>
+            <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+            <option value="resolved"    {% if ticket.status == 'resolved' %}selected{% endif %}>Resolved</option>
+            <option value="closed"      {% if ticket.status == 'closed' %}selected{% endif %}>Closed</option>
+          </select>
+          <input type="text" name="assigned_to" class="form-control form-control-sm"
+                 placeholder="Assign to..." value="{{ ticket.assigned_to }}" style="width:130px;"/>
+          <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </form>
+      </div>
+
+      {% if ticket.extra_data %}
+      <div class="mt-3 pt-3 border-top">
+        <div class="text-muted small fw-semibold mb-1">Extra Details</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for key, val in ticket.extra_data.items %}
+            <span class="keyword-chip">{{ key }}: {{ val }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+  {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-ticket" style="font-size:3rem; opacity:0.3;"></i>
+      <p class="mt-3">No tickets were raised for this call.</p>
+      {% if call.call_type == 'sales' %}
+        <p class="small">Tickets are created for service calls when an issue is reported.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+  {% endwith %}
+
+</div>
+
+{% endwith %}

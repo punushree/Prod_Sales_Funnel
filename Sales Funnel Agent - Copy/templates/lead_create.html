@@ -1,0 +1,792 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AOS Agent{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block nav_dashboard2 %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── GRID LAYOUTS ── */
+  .dash-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .dash-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;
+  }
+  .dash-grid-3 {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px;
+  }
+  @media (max-width: 960px) {
+    .dash-grid-2, .dash-grid-3 { grid-template-columns: 1fr; }
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.12); }
+  .kpi-card .kpi-glow {
+    position: absolute; top: -24px; right: -24px;
+    width: 80px; height: 80px; border-radius: 50%;
+    filter: blur(28px); opacity: 0.22;
+  }
+  .kpi-card .kpi-icon { font-size: 18px; margin-bottom: 8px; display: block; }
+  .kpi-card .kpi-value {
+    font-size: 1.9rem; font-weight: 800; line-height: 1;
+    letter-spacing: -0.02em; font-family: 'Outfit', sans-serif; margin-bottom: 4px;
+  }
+  .kpi-card .kpi-label {
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted);
+  }
+  .kpi-card .kpi-trend {
+    font-size: 10px; margin-top: 6px;
+  }
+  .trend-up { color: #4ade80; }
+  .trend-dn { color: #f87171; }
+
+  /* ── SECTION HEADING ── */
+  .section-head {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: #fff; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-head::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── PANEL CARD ── */
+  .panel-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+  }
+
+  /* ── QUOTA CARD ── */
+  .quota-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  .quota-org-name { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 14px; }
+  .quota-row { margin-bottom: 12px; }
+  .quota-row:last-child { margin-bottom: 0; }
+  .quota-meta {
+    display: flex; justify-content: space-between;
+    font-size: 11px; margin-bottom: 5px;
+  }
+  .quota-meta span:first-child { color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+  .quota-meta span:last-child { color: #fff; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── BOLNA TRIGGER ── */
+  .bolna-card {
+    background: linear-gradient(135deg, #0a1a2e, #0d1f35);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  .bolna-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .bolna-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(0,229,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
+  .bolna-label { font-weight: 700; color: var(--cyan); font-size: 13px; }
+  .bolna-sub   { font-size: 10px; color: var(--muted); }
+  .bolna-status {
+    margin-left: auto; font-size: 10px; font-weight: 700;
+    background: rgba(74,222,128,0.12); color: var(--green);
+    border: 1px solid rgba(74,222,128,0.2);
+    padding: 3px 10px; border-radius: 20px; letter-spacing: 0.07em;
+  }
+  .bolna-form-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end;
+  }
+  @media (max-width: 700px) { .bolna-form-row { grid-template-columns: 1fr 1fr; } }
+  .bolna-input-group label {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.08em; display: block; margin-bottom: 5px;
+  }
+  .bolna-input {
+    width: 100%; background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px; color: var(--text); font-size: 13px;
+    font-family: 'Outfit', sans-serif;
+    outline: none; transition: border-color 0.2s;
+  }
+  .bolna-input:focus { border-color: var(--cyan); }
+  .bolna-btn {
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    color: #000; border: none; border-radius: 10px;
+    padding: 9px 20px; font-size: 12px; font-weight: 800;
+    cursor: pointer; font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.05em; white-space: nowrap;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  .bolna-btn:hover { transform: translateY(-1px); }
+  #bolna-result { margin-top: 10px; font-size: 12px; display: none; }
+
+  /* ── SENTIMENT BAR ── */
+  .sent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .sent-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  .sent-track { flex: 1; height: 6px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+  .sent-fill  { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .sent-pct   { font-size: 11px; font-weight: 700; min-width: 32px; text-align: right; }
+  .sent-label { font-size: 11px; color: var(--muted); min-width: 60px; }
+
+  /* ── TEMP BOXES ── */
+  .temp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .temp-box {
+    border-radius: 12px; padding: 10px 12px; text-align: center;
+  }
+  .temp-box .tv { font-size: 20px; font-weight: 800; font-family: 'Outfit', sans-serif; line-height: 1; }
+  .temp-box .tl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+  .temp-hot  { background: rgba(239,68,68,0.12);  }
+  .temp-warm { background: rgba(251,191,36,0.12); }
+  .temp-cold { background: rgba(0,229,255,0.1);   }
+
+  /* ── SCORE BAR ── */
+  .score-wrap { margin-bottom: 6px; }
+  .score-meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .score-meta span:first-child { color: var(--muted); }
+  .score-meta span:last-child  { color: #fff; font-weight: 700; }
+  .score-track { height: 5px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+  .score-fill  { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+  /* ── INTENT ROWS ── */
+  .intent-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px;
+  }
+  .intent-row:last-child { border-bottom: none; }
+  .intent-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .intent-bar { width: 70px; height: 4px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+  .intent-fill { height: 100%; border-radius: 4px; }
+
+  /* ── TAGS ── */
+  .tag {
+    display: inline-block; font-size: 11px; padding: 3px 9px;
+    border-radius: 20px; margin: 3px 3px 0 0;
+  }
+  .tag-objection { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid rgba(255,255,255,0.08); }
+  .tag-signal    { background: rgba(74,222,128,0.1);  color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .tag-keyword   { background: rgba(0,229,255,0.08);  color: var(--cyan); border: 1px solid rgba(0,229,255,0.15); }
+
+  /* ── CALLS TABLE ── */
+  .calls-panel {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .calls-panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .calls-panel tbody tr { cursor: pointer; }
+  .calls-panel tbody tr:hover { background: rgba(255,255,255,0.03); }
+  .lead-name { font-weight: 600; font-size: 13px; color: var(--text); }
+
+  /* ── BADGES ── */
+  .badge-sales    { background: rgba(59,139,212,0.15); color: #60a5fa; border: 1px solid rgba(59,139,212,0.25); }
+  .badge-service  { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .badge-positive { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .badge-neutral  { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+  .badge-negative { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+  .badge-hot      { background: rgba(239,68,68,0.12);  color: #f87171; }
+  .badge-warm     { background: rgba(251,191,36,0.12); color: #fbbf24; }
+  .badge-cold     { background: rgba(0,229,255,0.1);   color: var(--cyan); }
+
+  /* ── OUTCOME OUTCOMES ── */
+  .outcome-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px; color: var(--muted);
+  }
+  .outcome-row:last-child { border-bottom: none; }
+  .outcome-pill {
+    font-size: 11px; font-weight: 700; padding: 2px 10px;
+    border-radius: 20px; font-family: 'JetBrains Mono', monospace;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════
+     KPI CARDS
+══════════════════════════════ -->
+<div class="dash-kpi-grid">
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--cyan);"></div>
+    <span class="kpi-icon">📞</span>
+    <div class="kpi-value" style="color:var(--cyan);">{{ stats.total_calls }}</div>
+    <div class="kpi-label">Total Calls</div>
+    <div class="kpi-trend trend-up">↑ this month</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--green);"></div>
+    <span class="kpi-icon">⭐</span>
+    <div class="kpi-value" style="color:var(--green);">{{ stats.total_leads }}</div>
+    <div class="kpi-label">Total Leads</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--amber);"></div>
+    <span class="kpi-icon">🎫</span>
+    <div class="kpi-value" style="color:var(--amber);">{{ stats.open_tickets }}</div>
+    <div class="kpi-label">Open Tickets</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--purple);"></div>
+    <span class="kpi-icon">👥</span>
+    <div class="kpi-value" style="color:var(--purple);">{{ stats.total_customers }}</div>
+    <div class="kpi-label">Customers</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:#f87171;"></div>
+    <span class="kpi-icon">🔥</span>
+    <div class="kpi-value" style="color:#f87171;">{{ stats.hot_leads|default:"0" }}</div>
+    <div class="kpi-label">Hot Leads</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--green);"></div>
+    <span class="kpi-icon">📈</span>
+    <div class="kpi-value" style="color:var(--green);">{{ stats.avg_conv_prob|default:"0" }}%</div>
+    <div class="kpi-label">Avg Conv. Prob.</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--cyan);"></div>
+    <span class="kpi-icon">🎯</span>
+    <div class="kpi-value" style="color:var(--cyan);">{{ stats.avg_lead_score|default:"0" }}</div>
+    <div class="kpi-label">Avg Lead Score</div>
+  </div>
+
+  {% if user.role == 'super_admin' %}
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background:var(--orange);"></div>
+    <span class="kpi-icon">🏢</span>
+    <div class="kpi-value" style="color:var(--orange);">{{ stats.total_orgs }}</div>
+    <div class="kpi-label">Organisations</div>
+  </div>
+  {% endif %}
+
+</div>
+
+
+<!-- ══════════════════════════════
+     QUOTA (org admin only)
+══════════════════════════════ -->
+{% if user.role != 'super_admin' %}
+<div class="quota-card">
+  <div class="quota-org-name">
+    <i class="bi bi-building me-2" style="color:var(--purple);"></i>
+    Quota — {{ user.org.name }}
+  </div>
+  <div class="quota-row">
+    <div class="quota-meta">
+      <span>Calls Used</span>
+      <span>{{ user.org.calls_used }} / {{ user.org.call_quota }}</span>
+    </div>
+    <div class="progress" style="height:7px;">
+      <div class="progress-bar bg-primary"
+        style="width:{% widthratio user.org.calls_used user.org.call_quota 100 %}%;"></div>
+    </div>
+  </div>
+  <div class="quota-row">
+    <div class="quota-meta">
+      <span>Minutes Used</span>
+      <span>{{ user.org.minutes_used }} / {{ user.org.minutes_quota }}</span>
+    </div>
+    <div class="progress" style="height:7px;">
+      <div class="progress-bar bg-success"
+        style="width:{% widthratio user.org.minutes_used user.org.minutes_quota 100 %}%;"></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════
+     BOLNA QUICK TRIGGER
+══════════════════════════════ -->
+<div class="bolna-card">
+  <div class="bolna-header">
+    <div class="bolna-icon">🎙️</div>
+    <div>
+      <div class="bolna-label">Bolna Voice Agent</div>
+      <div class="bolna-sub">Initiate an outbound call instantly</div>
+    </div>
+    <span class="bolna-status">● LIVE</span>
+  </div>
+  <div class="bolna-form-row">
+    <div class="bolna-input-group">
+      <label>Phone Number</label>
+      <input id="b-phone" class="bolna-input" type="tel" placeholder="+91 98765 43210" />
+    </div>
+    <div class="bolna-input-group">
+      <label>Lead Name</label>
+      <input id="b-name" class="bolna-input" type="text" placeholder="Rama Reddy" />
+    </div>
+    <div class="bolna-input-group">
+      <label>Agent Type</label>
+      <select id="b-agent" class="bolna-input">
+        <option value="sales">Sales Agent</option>
+        <option value="service">Service Agent</option>
+      </select>
+    </div>
+    <button class="bolna-btn" onclick="triggerBolnaCall()">↗ Call Now</button>
+  </div>
+  <div id="bolna-result"></div>
+</div>
+
+
+<!-- ══════════════════════════════
+     ROW: SENTIMENT + LEAD TEMP
+══════════════════════════════ -->
+<div class="dash-grid-2">
+
+  <!-- Sentiment Breakdown -->
+  <div class="panel-card">
+    <div class="section-head">😊 Sentiment Breakdown</div>
+
+    <div class="sent-row">
+      <div class="sent-dot" style="background:#4ade80;"></div>
+      <span class="sent-label">Positive</span>
+      <div class="sent-track">
+        <div class="sent-fill" style="width:{{ stats.positive_pct }}%; background:#4ade80;"></div>
+      </div>
+      <span class="sent-pct" style="color:#4ade80;">{{ stats.positive_pct }}%</span>
+    </div>
+
+    <div class="sent-row">
+      <div class="sent-dot" style="background:#fbbf24;"></div>
+      <span class="sent-label">Neutral</span>
+      <div class="sent-track">
+        <div class="sent-fill" style="width:{{ stats.neutral_pct }}%; background:#fbbf24;"></div>
+      </div>
+      <span class="sent-pct" style="color:#fbbf24;">{{ stats.neutral_pct }}%</span>
+    </div>
+
+    <div class="sent-row">
+      <div class="sent-dot" style="background:#f87171;"></div>
+      <span class="sent-label">Negative</span>
+      <div class="sent-track">
+        <div class="sent-fill" style="width:{{ stats.negative_pct }}%; background:#f87171;"></div>
+      </div>
+      <span class="sent-pct" style="color:#f87171;">{{ stats.negative_pct }}%</span>
+    </div>
+
+    <div style="margin-top:18px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06);">
+      <div style="display:flex; gap:20px;">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Avg Score</div>
+          <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:{% if stats.avg_sentiment >= 0 %}#4ade80{% else %}#f87171{% endif %};">
+            {% if stats.avg_sentiment >= 0 %}+{% endif %}{{ stats.avg_sentiment|default:"0.00" }}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Analysed</div>
+          <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--cyan);">
+            {{ stats.total_calls }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lead Temperature -->
+  <div class="panel-card">
+    <div class="section-head">🌡️ Lead Temperature</div>
+
+    <div class="temp-grid">
+      <div class="temp-box temp-hot">
+        <div class="tv" style="color:#f87171;">{{ stats.hot_leads|default:"0" }}</div>
+        <div class="tl" style="color:#f87171;">🔥 Hot</div>
+      </div>
+      <div class="temp-box temp-warm">
+        <div class="tv" style="color:#fbbf24;">{{ stats.warm_leads|default:"0" }}</div>
+        <div class="tl" style="color:#fbbf24;">☀️ Warm</div>
+      </div>
+      <div class="temp-box temp-cold">
+        <div class="tv" style="color:var(--cyan);">{{ stats.cold_leads|default:"0" }}</div>
+        <div class="tl" style="color:var(--cyan);">❄️ Cold</div>
+      </div>
+    </div>
+
+    <div class="score-wrap">
+      <div class="score-meta"><span>Hot avg score</span><span style="color:#f87171;">88 / 100</span></div>
+      <div class="score-track"><div class="score-fill" style="width:88%;background:#f87171;"></div></div>
+    </div>
+    <div class="score-wrap">
+      <div class="score-meta"><span>Warm avg score</span><span style="color:#fbbf24;">72 / 100</span></div>
+      <div class="score-track"><div class="score-fill" style="width:72%;background:#fbbf24;"></div></div>
+    </div>
+    <div class="score-wrap">
+      <div class="score-meta"><span>Cold avg score</span><span style="color:var(--cyan);">48 / 100</span></div>
+      <div class="score-track"><div class="score-fill" style="width:48%;background:var(--cyan);"></div></div>
+    </div>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Avg Conv. Probability (Sales)</div>
+      <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--green);">
+        {{ stats.avg_conv_prob|default:"0" }}%
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════
+     ROW: FUNNEL + INTENT + OUTCOMES
+══════════════════════════════ -->
+<div class="dash-grid-3">
+
+  <!-- Call Conversion Funnel -->
+  <div class="panel-card">
+    <div class="section-head">📊 Conversion Funnel</div>
+
+    {% with total=stats.total_calls %}
+
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Total Calls</span><span style="color:var(--cyan);font-weight:700;">{{ total }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:100%;background:linear-gradient(90deg,var(--cyan),rgba(0,229,255,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--cyan);">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Leads</span><span style="color:var(--purple);font-weight:700;">{{ stats.total_leads }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:{% if total %}{% widthratio stats.total_leads total 100 %}{% else %}0{% endif %}%;background:linear-gradient(90deg,var(--purple),rgba(139,92,246,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--purple);">{% if total %}{% widthratio stats.total_leads total 100 %}{% else %}0{% endif %}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Customers</span><span style="color:var(--green);font-weight:700;">{{ stats.total_customers }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:{% if total %}{% widthratio stats.total_customers total 100 %}{% else %}0{% endif %}%;background:linear-gradient(90deg,var(--green),rgba(74,222,128,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--green);">{% if total %}{% widthratio stats.total_customers total 100 %}{% else %}0{% endif %}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;">
+        <span>Open Tickets</span><span style="color:var(--amber);font-weight:700;">{{ stats.open_tickets }}</span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:{% if total %}{% widthratio stats.open_tickets total 100 %}{% else %}0{% endif %}%;background:linear-gradient(90deg,var(--amber),rgba(251,191,36,0.3));display:flex;align-items:center;padding-left:10px;">
+          <span style="font-size:11px;font-weight:700;color:var(--amber);">{% if total %}{% widthratio stats.open_tickets total 100 %}{% else %}0{% endif %}%</span>
+        </div>
+      </div>
+    </div>
+
+    {% endwith %}
+  </div>
+
+  <!-- Intent Distribution -->
+  <div class="panel-card">
+    <div class="section-head">🎯 Intent & Objections</div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Top intents</div>
+      <div class="intent-row">
+        <span>Purchase inquiry</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:42%;background:#378add;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">42%</span>
+        </div>
+      </div>
+      <div class="intent-row">
+        <span>Demo request</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:25%;background:#7f77dd;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">25%</span>
+        </div>
+      </div>
+      <div class="intent-row">
+        <span>Complaint</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:18%;background:#e24b4a;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">18%</span>
+        </div>
+      </div>
+      <div class="intent-row">
+        <span>Pricing query</span>
+        <div class="intent-bar-wrap">
+          <div class="intent-bar"><div class="intent-fill" style="width:15%;background:#ba7517;"></div></div>
+          <span style="font-size:11px;color:var(--muted);">15%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Top objections</div>
+    <span class="tag tag-objection">Too expensive</span>
+    <span class="tag tag-objection">Need approval</span>
+    <span class="tag tag-objection">Already using X</span>
+    <span class="tag tag-objection">Not right time</span>
+  </div>
+
+  <!-- Call Outcomes + Buying Signals -->
+  <div class="panel-card">
+    <div class="section-head">✅ Outcomes & Signals</div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Call outcomes</div>
+      <div class="outcome-row">
+        <span>Converted</span>
+        <span class="outcome-pill" style="background:rgba(74,222,128,0.12);color:#4ade80;">{{ stats.converted_count|default:"0" }}</span>
+      </div>
+      <div class="outcome-row">
+        <span>Follow-up scheduled</span>
+        <span class="outcome-pill" style="background:rgba(0,229,255,0.1);color:var(--cyan);">{{ stats.followup_count|default:"0" }}</span>
+      </div>
+      <div class="outcome-row">
+        <span>Not interested</span>
+        <span class="outcome-pill" style="background:rgba(239,68,68,0.1);color:#f87171;">{{ stats.not_interested_count|default:"0" }}</span>
+      </div>
+      <div class="outcome-row">
+        <span>Ticket raised</span>
+        <span class="outcome-pill" style="background:rgba(251,191,36,0.1);color:#fbbf24;">{{ stats.open_tickets }}</span>
+      </div>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Buying signals</div>
+    <span class="tag tag-signal">Sounds good</span>
+    <span class="tag tag-signal">Tell me more</span>
+    <span class="tag tag-signal">What's the price?</span>
+    <span class="tag tag-signal">When can we start?</span>
+
+    <div style="margin-top:12px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Top keywords</div>
+      <span class="tag tag-keyword">Pricing</span>
+      <span class="tag tag-keyword">Demo</span>
+      <span class="tag tag-keyword">Discount</span>
+      <span class="tag tag-keyword">Integration</span>
+      <span class="tag tag-keyword">ROI</span>
+      <span class="tag tag-keyword">Timeline</span>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════
+     RECENT CALLS TABLE
+══════════════════════════════ -->
+<div class="calls-panel">
+  <div class="calls-panel-header">
+    <span class="section-head" style="margin:0;">📞 Recent Calls</span>
+    <a href="{% url 'call_list' %}" class="btn btn-sm btn-outline-primary">View All →</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="table table-hover align-middle mb-0" style="font-size:12px;">
+      <thead>
+        <tr>
+          <th>Party</th>
+          <th>Agent</th>
+          <th>Direction</th>
+          <th>Sentiment</th>
+          <th>Lead Score</th>
+          <th>Temp</th>
+          <th>Duration</th>
+          <th>Status</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for call in recent_calls %}
+        <tr onclick="window.location='{% url 'call_detail' call.id %}'">
+          <td><div class="lead-name">{{ call.lead|default:call.customer|default:"—" }}</div></td>
+          <td>
+            <span class="badge {{ call.call_type|yesno:'badge-sales,badge-service' }}
+              {% if call.call_type == 'sales' %}badge-sales{% else %}badge-service{% endif %}">
+              {{ call.call_type|title }}
+            </span>
+          </td>
+          <td style="color:var(--muted);text-transform:capitalize;">{{ call.direction }}</td>
+          <td>
+            {% if call.analysis %}
+              <span class="badge badge-{{ call.analysis.sentiment }}">
+                {{ call.analysis.sentiment|title }}
+              </span>
+            {% else %}
+              <span style="color:var(--muted);font-size:11px;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if call.analysis and call.analysis.extra_kpi.lead_score %}
+              <span style="font-weight:700;color:
+                {% if call.analysis.extra_kpi.lead_score >= 80 %}#4ade80
+                {% elif call.analysis.extra_kpi.lead_score >= 60 %}#fbbf24
+                {% else %}#f87171{% endif %};">
+                {{ call.analysis.extra_kpi.lead_score }}
+              </span>
+            {% else %}
+              <span style="color:var(--muted);">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if call.analysis and call.analysis.extra_kpi.temperature %}
+              <span class="badge badge-{{ call.analysis.extra_kpi.temperature }}">
+                {{ call.analysis.extra_kpi.temperature|title }}
+              </span>
+            {% else %}
+              <span style="color:var(--muted);">—</span>
+            {% endif %}
+          </td>
+          <td style="font-family:'JetBrains Mono',monospace;color:var(--muted);">{{ call.duration_seconds }}s</td>
+          <td>
+            <span class="badge {% if call.status == 'completed' %}bg-success{% else %}bg-secondary{% endif %}">
+              {{ call.status|title }}
+            </span>
+          </td>
+          <td style="color:var(--muted);">{{ call.started_at|date:"d M, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align:center;padding:32px;color:var(--muted);">
+            No calls yet. Trigger one via Bolna above ↑
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════
+     RECENT LEADS TABLE
+══════════════════════════════ -->
+<div class="calls-panel">
+  <div class="calls-panel-header">
+    <span class="section-head" style="margin:0;">⭐ Recent Leads</span>
+    <div style="display:flex;gap:8px;">
+      <a href="{% url 'lead_create' %}" class="btn btn-sm btn-success">+ New Lead</a>
+      <a href="{% url 'lead_list' %}"   class="btn btn-sm btn-outline-success">View All →</a>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="table table-hover align-middle mb-0" style="font-size:12px;">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Company</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in recent_leads %}
+        <tr onclick="window.location='{% url 'lead_detail' lead.id %}'">
+          <td><a href="{% url 'lead_detail' lead.id %}" style="font-weight:600;">{{ lead.name }}</a></td>
+          <td style="font-family:'JetBrains Mono',monospace;color:var(--muted);">{{ lead.phone }}</td>
+          <td style="color:var(--muted);">{{ lead.company|default:"—" }}</td>
+          <td><span class="badge bg-info">{{ lead.status|title }}</span></td>
+          <td style="color:var(--muted);">{{ lead.created_at|date:"d M, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="text-align:center;padding:32px;color:var(--muted);">
+            No leads yet. <a href="{% url 'lead_create' %}" style="color:var(--cyan);">Create one →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+  function triggerBolnaCall() {
+    const phone  = document.getElementById('b-phone').value.trim();
+    const name   = document.getElementById('b-name').value.trim();
+    const agent  = document.getElementById('b-agent').value;
+    const btn    = document.querySelector('.bolna-btn');
+    const result = document.getElementById('bolna-result');
+
+    if (!phone) {
+      result.style.display  = 'block';
+      result.style.color    = 'var(--red)';
+      result.textContent    = '⚠ Please enter a phone number.';
+      return;
+    }
+
+    btn.textContent   = '⏳ Initiating…';
+    btn.style.opacity = '0.7';
+
+    fetch('/api/bolna/initiate/', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({ phone, name, agent_type: agent }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      result.style.display = 'block';
+      if (data.success) {
+        result.style.color = 'var(--green)';
+        result.textContent = `✓ Call initiated to ${phone}. Call ID: ${data.call_id || 'pending'}`;
+      } else {
+        result.style.color = 'var(--red)';
+        result.textContent = `✗ ${data.error || 'Failed to initiate call.'}`;
+      }
+    })
+    .catch(() => {
+      result.style.display = 'block';
+      result.style.color   = 'var(--amber)';
+      result.textContent   = '⚠ Could not reach Bolna endpoint.';
+    })
+    .finally(() => {
+      btn.textContent   = '↗ Call Now';
+      btn.style.opacity = '1';
+    });
+  }
+</script>
+{% endblock %}

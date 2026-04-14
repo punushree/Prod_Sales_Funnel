@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Calls — AOS Agent{% endblock %}
+{% block page_title %}Call History{% endblock %}
+{% block nav_calls %}active{% endblock %}
+{% block nav_calls2 %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div style="font-size:13px;color:var(--muted);font-weight:500;">{{ calls|length }} call{{ calls|length|pluralize }}</div>
+  <div style="display:flex;gap:8px;">
+    <a href="?call_type=sales" class="btn-ghost" style="font-size:12px;padding:6px 14px;text-decoration:none;">Sales</a>
+    <a href="?call_type=service" class="btn-ghost" style="font-size:12px;padding:6px 14px;text-decoration:none;">Service</a>
+    <a href="{% url 'call_list' %}" class="btn-ghost" style="font-size:12px;padding:6px 14px;text-decoration:none;">All</a>
+  </div>
+</div>
+
+<div class="table-panel">
+  <table>
+    <thead>
+      <tr><th>Contact</th><th>Type</th><th>Direction</th><th>Duration</th><th>Status</th><th>Date</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for call in calls %}
+      <tr data-call-uuid="{{ call.id }}"
+          data-bolna-id="{{ call.bolna_call_id }}"
+          data-call-status="{{ call.status }}"
+          data-started-at="{{ call.started_at.isoformat }}"
+          data-contact-name="{{ call.contact_label }}"
+          data-contact-phone="{{ call.contact_phone }}"
+          data-contact-label="{{ call.contact_label }}"
+          >
+        <td style="font-weight:600;color:#fff;">
+          {# FIX: contact_label now returns phone number when name is unavailable #}
+          {{ call.contact_label }}
+        </td>
+        <td>
+          {% if call.call_type == 'sales' %}<span class="badge-pill badge-cyan">Sales</span>
+          {% else %}<span class="badge-pill badge-purple">Service</span>{% endif %}
+        </td>
+        <td>
+          {% if call.direction == 'outbound' %}<span style="color:var(--green);font-size:12px;font-weight:600;">↗ Outbound</span>
+          {% else %}<span style="color:var(--blue);font-size:12px;font-weight:600;">↙ Inbound</span>{% endif %}
+        </td>
+        <td style="font-family:var(--mono);font-size:12px;" class="cell-duration-{{ call.id }}">
+          {# FIX: duration_display shows '—' or 'Live' instead of '0s' #}
+          {{ call.duration_display }}
+        </td>
+        <td class="cell-status-{{ call.id }}">
+          {% if call.status == 'completed' %}<span class="badge-pill badge-green">Completed</span>
+          {% elif call.status == 'in_progress' %}<span class="badge-pill badge-amber">⏳ In Progress</span>
+          {% elif call.status == 'failed' %}<span class="badge-pill badge-red">Failed</span>
+          {% else %}<span class="badge-pill" style="background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border);">{{ call.status }}</span>{% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--muted);">{{ call.started_at|date:"d M Y H:i" }}</td>
+        <td><a href="{% url 'call_detail' call.id %}" style="font-size:12px;font-weight:600;">View →</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" style="text-align:center;padding:52px;color:var(--muted);">
+        <i class="bi bi-telephone" style="font-size:28px;display:block;margin-bottom:10px;opacity:0.3;"></i>
+        No calls recorded yet
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  // Collect all rows that are currently in_progress
+  const inProgressRows = Array.from(
+    document.querySelectorAll('tr[data-call-status="in_progress"]')
+  );
+
+  if (!inProgressRows.length) return;
+
+  // ── Live timer: count up from started_at for each in-progress call ──
+  const liveTimers = {}; // callUuid → intervalId
+
+  function startLiveTimer(callUuid, startedAtISO) {
+    // If already running with a real timestamp, don't restart
+    if (liveTimers[callUuid] && liveTimers[callUuid + '_hasTs']) return;
+    // If we now have a real timestamp, clear any fallback timer and restart properly
+    if (liveTimers[callUuid] && startedAtISO) {
+      clearInterval(liveTimers[callUuid]);
+      delete liveTimers[callUuid];
+    }
+    const durationCell = document.querySelector('.cell-duration-' + callUuid);
+    if (!durationCell) return;
+
+    const startMs = startedAtISO ? new Date(startedAtISO).getTime() : Date.now();
+    if (startedAtISO) liveTimers[callUuid + '_hasTs'] = true;
+
+    function tick() {
+      const elapsed = Math.floor((Date.now() - startMs) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      durationCell.textContent = (m > 0 ? m + 'm ' : '') + s + 's ⏱';
+    }
+    tick();
+    liveTimers[callUuid] = setInterval(tick, 1000);
+  }
+
+  function stopLiveTimer(callUuid) {
+    if (liveTimers[callUuid]) {
+      clearInterval(liveTimers[callUuid]);
+      delete liveTimers[callUuid];
+      delete liveTimers[callUuid + '_hasTs'];
+    }
+  }
+
+  // Poll each in-progress row individually
+  inProgressRows.forEach(function (row) {
+    const bolnaId  = row.dataset.bolnaId;
+    const callUuid = row.dataset.callUuid;
+
+    // ── START TIMER IMMEDIATELY from the server-stamped started_at ──
+    // This means the duration ticks from the very first page load,
+    // no waiting for the first poll response.
+    const startedAt = row.dataset.startedAt;
+    if (startedAt) {
+      startLiveTimer(callUuid, startedAt);
+    }
+
+    // No bolna_call_id yet — timer already started above, reload after 8s
+    if (!bolnaId) {
+      if (!startedAt) startLiveTimer(callUuid, null); // fallback if no started_at either
+      setTimeout(() => location.reload(), 8000);
+      return;
+    }
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 40; // ~3 min at 5-s intervals
+
+    function poll() {
+      attempts++;
+      fetch('/api/call/' + bolnaId + '/analysis-status/', {credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(function (data) {
+          const statusCell   = document.querySelector('.cell-status-'   + callUuid);
+          const durationCell = document.querySelector('.cell-duration-' + callUuid);
+
+          if (data.ready) {
+            // ── Call completed — stop live timer, show final duration ──
+            stopLiveTimer(callUuid);
+            if (statusCell) {
+              statusCell.innerHTML = '<span class="badge-pill badge-green">Completed</span>';
+            }
+            if (durationCell && data.duration_display) {
+              durationCell.textContent = data.duration_display;
+            }
+            row.dataset.callStatus = 'completed';
+
+          } else {
+            // ── Still in progress ──
+            const stage = data.stage_label || 'In Progress…';
+            if (statusCell) {
+              statusCell.innerHTML =
+                '<span class="badge-pill badge-amber" title="' + stage + '">⏳ ' + stage + '</span>';
+            }
+
+            // Start or keep live timer using server-side started_at
+            if (data.started_at) {
+              startLiveTimer(callUuid, data.started_at);
+            } else if (data.duration_seconds > 0) {
+              // Fallback: server elapsed time (not live, but better than nothing)
+              if (durationCell) durationCell.textContent = data.duration_display || (data.duration_seconds + 's');
+            }
+
+            if (data.stage < 4 && attempts < MAX_ATTEMPTS) {
+              setTimeout(poll, 5000);
+            } else if (attempts >= MAX_ATTEMPTS) {
+              stopLiveTimer(callUuid);
+              location.reload();
+            }
+          }
+        })
+        .catch(function () {
+          if (attempts < MAX_ATTEMPTS) setTimeout(poll, 8000);
+        });
+    }
+
+    // Kick off a live timer immediately (optimistic), then start polling
+    startLiveTimer(callUuid, null);
+    setTimeout(poll, 3000);
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Leads — AOS Agent{% endblock %}
+{% block page_title %}Leads{% endblock %}
+{% block nav_leads %}active{% endblock %}
+{% block nav_leads2 %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div style="font-size:13px;color:var(--muted);font-weight:500;">{{ leads|length }} lead{{ leads|length|pluralize }}</div>
+  <a href="{% url 'lead_create' %}" class="btn-primary-glow" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+    <i class="bi bi-plus-lg"></i> New Lead
+  </a>
+</div>
+
+<div class="table-panel">
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Phone</th><th>Company</th><th>Status</th><th>Created</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td style="font-weight:600;color:#fff;">{{ lead.name }}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--cyan);">{{ lead.phone }}</td>
+        <td>{{ lead.company|default:"—" }}</td>
+        <td>
+          {% if lead.status == 'converted' %}<span class="badge-pill badge-green">Converted</span>
+          {% elif lead.status == 'interested' %}<span class="badge-pill badge-cyan">Interested</span>
+          {% elif lead.status == 'called' %}<span class="badge-pill badge-amber">Called</span>
+          {% elif lead.status == 'not_interested' %}<span class="badge-pill badge-red">Not Interested</span>
+          {% else %}<span class="badge-pill" style="background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border);">New</span>{% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--muted);">{{ lead.created_at|date:"d M Y" }}</td>
+        <td><a href="{% url 'lead_detail' lead.id %}" style="font-size:12px;font-weight:600;">View →</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;padding:52px;color:var(--muted);">
+        <i class="bi bi-person-plus" style="font-size:28px;display:block;margin-bottom:10px;opacity:0.3;"></i>
+        No leads yet
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

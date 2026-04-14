@@ -1,0 +1,896 @@
+{% extends "base.html" %}
+{% block title %}Call Story — AOS Agent{% endblock %}
+{% block page_title %}Call Story{% endblock %}
+{% block nav_calls %}active{% endblock %}
+{% block nav_calls2 %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ══════════════════════════════
+     STORY HEADER
+  ══════════════════════════════ */
+  .story-header {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 26px 30px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .story-avatar {
+    width: 58px; height: 58px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; font-weight: 800; color: #fff; flex-shrink: 0;
+    font-family: 'Outfit', sans-serif;
+  }
+  .avatar-hot  { background: linear-gradient(135deg, var(--orange), #ff9a6c); box-shadow: 0 0 20px rgba(255,107,53,0.35); }
+  .avatar-warm { background: linear-gradient(135deg, var(--amber), #fde68a); color: #5d4037 !important; box-shadow: 0 0 20px rgba(251,191,36,0.3); }
+  .avatar-cold { background: linear-gradient(135deg, #1565c0, var(--cyan)); box-shadow: 0 0 20px rgba(0,229,255,0.3); }
+
+  .story-name {
+    font-size: 1.3rem; font-weight: 800; color: #fff;
+    font-family: 'Outfit', sans-serif; letter-spacing: -0.02em;
+    margin-bottom: 5px;
+  }
+  .story-meta {
+    font-size: 12px; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  }
+  .meta-sep { color: #2a3a50; }
+
+  /* temp pill */
+  .temp-pill {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 20px; border-radius: 16px; flex-shrink: 0;
+  }
+  .pill-hot  { background: linear-gradient(135deg, rgba(255,107,53,0.2), rgba(255,107,53,0.08)); border: 1px solid rgba(255,107,53,0.3); }
+  .pill-warm { background: linear-gradient(135deg, rgba(251,191,36,0.2), rgba(251,191,36,0.08)); border: 1px solid rgba(251,191,36,0.3); }
+  .pill-cold { background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,229,255,0.05)); border: 1px solid rgba(0,229,255,0.25); }
+  .temp-emoji  { font-size: 2rem; }
+  .pill-label  { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .pill-value  { font-size: 15px; font-weight: 700; color: #fff; }
+  .pill-score  {
+    font-size: 2rem; font-weight: 800;
+    font-family: 'Outfit', sans-serif; margin-left: 8px;
+  }
+  .pill-score span { font-size: 0.75rem; opacity: 0.5; }
+  .pill-hot .pill-score  { color: var(--orange); }
+  .pill-warm .pill-score { color: var(--amber); }
+  .pill-cold .pill-score { color: var(--cyan); }
+
+  /* ══════════════════════════════
+     SENTIMENT FLOW BAR
+  ══════════════════════════════ */
+  .sentiment-flow-wrap {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 22px;
+    margin-bottom: 20px;
+  }
+  .sentiment-flow-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .sentiment-flow-bar {
+    display: flex; gap: 3px; height: 12px; border-radius: 8px; overflow: hidden;
+  }
+  .sf-seg { flex: 1; border-radius: 2px; }
+
+  /* ══════════════════════════════
+     TABS
+  ══════════════════════════════ */
+  .story-tabs {
+    display: flex; gap: 4px;
+    background: #0a1520; border-radius: 14px;
+    padding: 5px; width: fit-content;
+    margin-bottom: 22px;
+    border: 1px solid var(--border);
+  }
+  .story-tab {
+    padding: 7px 20px; border-radius: 10px;
+    border: none; cursor: pointer;
+    font-size: 12px; font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.04em;
+    background: transparent; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .story-tab.active {
+    background: rgba(0,229,255,0.1);
+    color: var(--cyan);
+    border: 1px solid rgba(0,229,255,0.2);
+  }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; animation: fadeUp 0.25s ease; }
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(6px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  /* ══════════════════════════════
+     STORY TIMELINE
+  ══════════════════════════════ */
+  .story-timeline { position: relative; }
+  .story-timeline::before {
+    content: ''; position: absolute;
+    left: 11px; top: 14px; bottom: 14px; width: 2px;
+    background: linear-gradient(to bottom, rgba(0,229,255,0.3), transparent);
+  }
+
+  .story-step { display: flex; gap: 22px; margin-bottom: 20px; position: relative; }
+
+  .step-dot {
+    width: 24px; height: 24px; border-radius: 8px;
+    flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .dot-blue   { background: rgba(0,229,255,0.2);  color: var(--cyan);   box-shadow: 0 0 10px rgba(0,229,255,0.3); }
+  .dot-purple { background: rgba(167,139,250,0.2); color: var(--purple); box-shadow: 0 0 10px rgba(167,139,250,0.3); }
+  .dot-orange { background: rgba(255,107,53,0.2);  color: var(--orange); box-shadow: 0 0 10px rgba(255,107,53,0.3); }
+  .dot-green  { background: rgba(74,222,128,0.2);  color: var(--green);  box-shadow: 0 0 10px rgba(74,222,128,0.3); }
+  .dot-red    { background: rgba(248,113,113,0.2); color: var(--red);    box-shadow: 0 0 10px rgba(248,113,113,0.3); }
+
+  .step-body {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 22px;
+    flex: 1;
+    transition: border-color 0.2s;
+  }
+  .step-body:hover { border-color: rgba(255,255,255,0.1); }
+
+  .step-title {
+    font-weight: 700; font-size: 11px; color: #fff;
+    margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    font-family: 'Outfit', sans-serif;
+  }
+  .step-text { font-size: 13px; color: #9ab0c8; line-height: 1.7; }
+
+  /* ── keyword tags ── */
+  .kw-tag {
+    display: inline-block;
+    background: rgba(167,139,250,0.12);
+    border: 1px solid rgba(167,139,250,0.2);
+    color: var(--purple);
+    padding: 3px 11px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    margin: 3px 3px 3px 0;
+  }
+
+  /* ── KPI bars ── */
+  .kpi-story-row { display: flex; flex-direction: column; gap: 16px; }
+  .kpi-story-label { font-size: 11px; font-weight: 600; color: #9ab0c8; margin-bottom: 7px; }
+  .kpi-story-bar {
+    height: 10px; background: rgba(255,255,255,0.06);
+    border-radius: 5px; overflow: hidden; margin-bottom: 5px;
+  }
+  .kpi-story-fill { height: 100%; border-radius: 5px; transition: width 1.2s cubic-bezier(.4,0,.2,1); }
+  .fill-green { background: linear-gradient(90deg, var(--green), #22c55e44); }
+  .fill-amber { background: linear-gradient(90deg, var(--amber), #fbbf2444); }
+  .fill-red   { background: linear-gradient(90deg, var(--red),   #f8717144); }
+  .kpi-story-score { font-size: 11px; color: var(--muted); }
+
+  /* ── sentiment badge ── */
+  .sentiment-badge {
+    display: inline-block; padding: 2px 12px;
+    border-radius: 20px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .sent-positive { background: rgba(74,222,128,0.15);  color: var(--green);  border: 1px solid rgba(74,222,128,0.25);  }
+  .sent-negative { background: rgba(248,113,113,0.15); color: var(--red);    border: 1px solid rgba(248,113,113,0.25); }
+  .sent-neutral  { background: rgba(251,191,36,0.15);  color: var(--amber);  border: 1px solid rgba(251,191,36,0.25);  }
+
+  /* ── conversion bar ── */
+  .conv-bar {
+    height: 10px; background: rgba(255,255,255,0.06);
+    border-radius: 5px; overflow: hidden; max-width: 380px;
+  }
+  .conv-fill {
+    height: 100%; border-radius: 5px;
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    box-shadow: 0 0 10px rgba(0,229,255,0.25);
+  }
+  .conv-label { font-size: 12px; color: #9ab0c8; }
+
+  /* ── ticket card ── */
+  .ticket-story-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .ticket-type-tag {
+    background: rgba(0,229,255,0.12); color: var(--cyan);
+    border: 1px solid rgba(0,229,255,0.2);
+    padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  }
+  .ticket-status-tag {
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+  }
+  .status-open       { background: rgba(248,113,113,0.15); color: var(--red);    border: 1px solid rgba(248,113,113,0.2); }
+  .status-in_progress{ background: rgba(251,191,36,0.15);  color: var(--amber);  border: 1px solid rgba(251,191,36,0.2);  }
+  .status-resolved   { background: rgba(74,222,128,0.15);  color: var(--green);  border: 1px solid rgba(74,222,128,0.2);  }
+  .status-closed     { background: rgba(255,255,255,0.06); color: #555;          border: 1px solid rgba(255,255,255,0.1); }
+  .ticket-story-desc { font-size: 13px; color: #9ab0c8; line-height: 1.6; }
+  .ticket-story-meta { font-size: 11px; color: var(--muted); }
+
+  /* ══════════════════════════════
+     TRANSCRIPT
+  ══════════════════════════════ */
+  .transcript-outer {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 22px 24px;
+  }
+  .transcript-scroll {
+    max-height: 540px; overflow-y: auto; padding-right: 6px;
+  }
+
+  .chat-wrap { display: flex; margin-bottom: 14px; }
+  .agent-side    { justify-content: flex-start; }
+  .customer-side { justify-content: flex-end;   }
+
+  .chat-bubble {
+    max-width: 68%; padding: 11px 16px; border-radius: 14px;
+    font-size: 13px; line-height: 1.6; color: var(--text);
+  }
+  .agent-side .chat-bubble {
+    background: rgba(0,229,255,0.07);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-bottom-left-radius: 4px;
+  }
+  .customer-side .chat-bubble {
+    background: rgba(167,139,250,0.08);
+    border: 1px solid rgba(167,139,250,0.15);
+    border-bottom-right-radius: 4px;
+  }
+  .bubble-meta {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+    color: var(--muted); margin-bottom: 5px;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .agent-side    .bubble-meta { color: rgba(0,229,255,0.7); }
+  .customer-side .bubble-meta { color: rgba(167,139,250,0.7); justify-content: flex-end; }
+
+  .transcript-raw {
+    font-size: 12px; background: rgba(255,255,255,0.03);
+    padding: 16px; border-radius: 10px; border: 1px solid var(--border);
+    max-height: 540px; overflow-y: auto;
+    white-space: pre-wrap; color: #9ab0c8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ══════════════════════════════
+     BOLNA PANEL (inside detail)
+  ══════════════════════════════ */
+  .bolna-detail-card {
+    background: linear-gradient(135deg, #0a1a2e, #0d1f35);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 16px; padding: 22px 24px;
+  }
+  .bolna-meta-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+  }
+  .bolna-meta-item {
+    background: rgba(255,255,255,0.03); border-radius: 10px; padding: 10px 14px;
+  }
+  .bolna-meta-item .mk  { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.09em; }
+  .bolna-meta-item .mv  { font-size: 12px; color: var(--text); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .bolna-recall-btn {
+    width: 100%; padding: 11px;
+    border-radius: 12px; border: none;
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    color: #000; font-weight: 800; font-size: 13px;
+    cursor: pointer; font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 18px rgba(0,229,255,0.2);
+    transition: transform 0.15s, box-shadow 0.2s;
+  }
+  .bolna-recall-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 28px rgba(0,229,255,0.4);
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+{% with kpi=call.analysis.extra_kpi analysis=call.analysis party=call.lead|default:call.customer %}
+
+
+<!-- ══════════════════════════════════════════
+     STORY HEADER
+════════════════════════════════════════════ -->
+<div class="story-header">
+  <div class="d-flex align-items-center gap-3">
+    <div class="story-avatar
+      {% if kpi.temperature == 'hot' %}avatar-hot
+      {% elif kpi.temperature == 'warm' %}avatar-warm
+      {% else %}avatar-cold{% endif %}">
+      {% if party %}{{ party.name|slice:":1"|upper }}{% else %}?{% endif %}
+    </div>
+    <div>
+      <div class="story-name">
+        {% if party %}{{ party.name }}{% else %}Unknown Caller{% endif %}
+      </div>
+      <div class="story-meta">
+        {% if party.phone %}<span>📞 {{ party.phone }}</span><span class="meta-sep">·</span>{% endif %}
+        {% if party.email %}<span>✉️ {{ party.email }}</span><span class="meta-sep">·</span>{% endif %}
+        <span>🕐 {{ call.started_at|date:"d M Y, H:i" }}</span>
+        <span class="meta-sep">·</span>
+        <span>⏱ {{ call.duration_seconds }}s</span>
+        <span class="meta-sep">·</span>
+        <span class="badge {% if call.call_type == 'sales' %}bg-primary{% else %}bg-success{% endif %}">
+          {{ call.call_type|title }}
+        </span>
+        <span class="badge bg-secondary">{{ call.direction|title }}</span>
+      </div>
+    </div>
+  </div>
+
+  {% if kpi %}
+  <div class="temp-pill
+    {% if kpi.temperature == 'hot' %}pill-hot
+    {% elif kpi.temperature == 'warm' %}pill-warm
+    {% else %}pill-cold{% endif %}">
+    <span class="temp-emoji">
+      {% if kpi.temperature == 'hot' %}🔥{% elif kpi.temperature == 'warm' %}🌤️{% else %}❄️{% endif %}
+    </span>
+    <div>
+      <div class="pill-label">Lead Temperature</div>
+      <div class="pill-value">{{ kpi.temperature|title }} Lead</div>
+    </div>
+    <div class="pill-score">{{ kpi.overall_score }}<span>/10</span></div>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     SENTIMENT FLOW BAR
+════════════════════════════════════════════ -->
+{% if call.transcript and call.transcript.turns %}
+<div class="sentiment-flow-wrap">
+  <div class="sentiment-flow-label">Sentiment Journey · {{ call.transcript.turns|length }} turns</div>
+  <div class="sentiment-flow-bar">
+    {% for turn in call.transcript.turns %}
+      <div class="sf-seg" title="{{ turn.speaker }}: {{ turn.timestamp }}s"
+        style="background:
+          {% if turn.sentiment == 'positive' %}var(--green)
+          {% elif turn.sentiment == 'negative' %}var(--red)
+          {% else %}var(--amber){% endif %};
+          opacity: 0.8;">
+      </div>
+    {% endfor %}
+  </div>
+  <div class="d-flex gap-3 justify-content-end mt-2">
+    {% for color, lbl in "var(--green),Positive"|add:",var(--amber),Neutral"|add:",var(--red),Negative" %}{% endfor %}
+    <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;">
+      <span style="width:8px;height:8px;border-radius:2px;background:var(--green);display:inline-block;"></span>Positive
+    </span>
+    <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;">
+      <span style="width:8px;height:8px;border-radius:2px;background:var(--amber);display:inline-block;"></span>Neutral
+    </span>
+    <span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;">
+      <span style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block;"></span>Negative
+    </span>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════
+     TABS
+════════════════════════════════════════════ -->
+<div class="story-tabs">
+  <button class="story-tab active" onclick="switchTab('story', this)">📖 Story</button>
+  <button class="story-tab" onclick="switchTab('transcript', this)">🗒 Transcript</button>
+  {% if kpi %}<button class="story-tab" onclick="switchTab('insights', this)">🧠 Insights</button>{% endif %}
+  <button class="story-tab" onclick="switchTab('bolna', this)">🎙️ Bolna</button>
+</div>
+
+
+<!-- ════════════════
+     TAB: STORY
+════════════════ -->
+<div id="tab-story" class="tab-pane active">
+<div class="story-timeline">
+
+  <!-- Step 1 -->
+  <div class="story-step">
+    <div class="step-dot dot-blue">📞</div>
+    <div class="step-body">
+      <div class="step-title">The Call</div>
+      <div class="step-text">
+        {% if party %}
+          <strong style="color:#fff;">{{ party.name }}</strong>
+          {% if call.direction == 'inbound' %}called in{% else %}was contacted{% endif %}
+          on <strong style="color:#fff;">{{ call.started_at|date:"d M Y at H:i" }}</strong>.
+          The call lasted <strong style="color:#fff;">{{ call.duration_seconds }} seconds</strong>
+          and ended with status <strong style="color:#fff;">{{ call.status }}</strong>.
+        {% else %}
+          An unknown caller {% if call.direction == 'inbound' %}called in{% else %}was contacted{% endif %}
+          on {{ call.started_at|date:"d M Y at H:i" }}.
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  {% if analysis and analysis.summary %}
+  <div class="story-step">
+    <div class="step-dot dot-purple">💬</div>
+    <div class="step-body">
+      <div class="step-title">What Was Discussed</div>
+      <div class="step-text">{{ analysis.summary }}</div>
+      {% if analysis.keywords %}
+      <div class="mt-3">
+        {% for kw in analysis.keywords %}
+          <span class="kw-tag">{{ kw }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Step 3 -->
+  {% if kpi %}
+  <div class="story-step">
+    <div class="step-dot dot-orange">📊</div>
+    <div class="step-body">
+      <div class="step-title">How They Responded</div>
+      <div class="step-text mb-3">Engagement measured across three signals:</div>
+      <div class="kpi-story-row">
+
+        <div>
+          <div class="kpi-story-label">🗣️ Communication Tone</div>
+          <div class="kpi-story-bar">
+            <div class="kpi-story-fill
+              {% if kpi.tone_score >= 7 %}fill-green
+              {% elif kpi.tone_score >= 4 %}fill-amber
+              {% else %}fill-red{% endif %}"
+              style="width:{{ kpi.tone_score }}0%"></div>
+          </div>
+          <div class="kpi-story-score">{{ kpi.tone_score }}/10 —
+            {% if kpi.tone_score >= 7 %}Positive &amp; confident
+            {% elif kpi.tone_score >= 4 %}Neutral tone
+            {% else %}Disengaged{% endif %}
+          </div>
+        </div>
+
+        <div>
+          <div class="kpi-story-label">❓ Questions Asked by Lead</div>
+          <div class="kpi-story-bar">
+            <div class="kpi-story-fill
+              {% if kpi.questions_score >= 7 %}fill-green
+              {% elif kpi.questions_score >= 4 %}fill-amber
+              {% else %}fill-red{% endif %}"
+              style="width:{{ kpi.questions_score }}0%"></div>
+          </div>
+          <div class="kpi-story-score">{{ kpi.questions_score }}/10 —
+            {{ kpi.question_count }} question{{ kpi.question_count|pluralize }} asked —
+            {% if kpi.questions_score >= 7 %}Highly curious
+            {% elif kpi.questions_score >= 4 %}Moderately interested
+            {% else %}Low engagement{% endif %}
+          </div>
+        </div>
+
+        <div>
+          <div class="kpi-story-label">⏱️ Conversation Length</div>
+          <div class="kpi-story-bar">
+            <div class="kpi-story-fill
+              {% if kpi.length_score >= 7 %}fill-green
+              {% elif kpi.length_score >= 4 %}fill-amber
+              {% else %}fill-red{% endif %}"
+              style="width:{{ kpi.length_score }}0%"></div>
+          </div>
+          <div class="kpi-story-score">{{ kpi.length_score }}/10 —
+            {{ call.duration_seconds }}s —
+            {% if kpi.length_score >= 7 %}Great engagement
+            {% elif kpi.length_score >= 4 %}Average call
+            {% else %}Very brief, possible drop-off{% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Step 4 -->
+  {% if analysis %}
+  <div class="story-step">
+    <div class="step-dot dot-green">🎯</div>
+    <div class="step-body">
+      <div class="step-title">Outcome &amp; Conversion Signal</div>
+      <div class="step-text">
+        Overall sentiment was
+        <span class="sentiment-badge
+          {% if analysis.sentiment == 'positive' %}sent-positive
+          {% elif analysis.sentiment == 'negative' %}sent-negative
+          {% else %}sent-neutral{% endif %}">
+          {{ analysis.sentiment|title }}
+        </span>.
+
+        {% if analysis.conversion_probability is not None %}
+          &nbsp; Conversion probability:
+          <strong style="color:#fff;">{{ analysis.conversion_probability|floatformat:1 }}%</strong>
+
+          <div class="conv-bar mt-3">
+            <div class="conv-fill" style="width:{{ analysis.conversion_probability|floatformat:0 }}%"></div>
+          </div>
+
+          <div class="conv-label mt-2">
+            {% if analysis.conversion_probability >= 70 %}
+              ✅ <strong>High chance of conversion.</strong> Follow up within 24 hours.
+            {% elif analysis.conversion_probability >= 40 %}
+              🔄 <strong>Moderate interest.</strong> Nurture with more information.
+            {% else %}
+              ⚠️ <strong>Low conversion signal.</strong> May need a different approach.
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Step 5 -->
+  {% with tickets=call.tickets.all %}
+  {% if tickets %}
+  <div class="story-step">
+    <div class="step-dot dot-red">🎫</div>
+    <div class="step-body">
+      <div class="step-title">Issue Raised to Human Agent</div>
+      {% for ticket in tickets %}
+      <div class="ticket-story-card {% if not forloop.first %}mt-3{% endif %}">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <span class="ticket-type-tag">{{ ticket.issue_type|title }}</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;font-family:'JetBrains Mono',monospace;">
+              #{{ ticket.id|stringformat:"s"|slice:":8"|upper }}
+            </span>
+          </div>
+          <span class="ticket-status-tag status-{{ ticket.status }}">
+            {% if ticket.status == 'open' %}🔴 Open
+            {% elif ticket.status == 'in_progress' %}🟡 In Progress
+            {% elif ticket.status == 'resolved' %}🟢 Resolved
+            {% else %}⚫ Closed{% endif %}
+          </span>
+        </div>
+        <p class="ticket-story-desc mt-2 mb-1">{{ ticket.description }}</p>
+        <div class="ticket-story-meta">
+          {% if ticket.assigned_to %}👷 <strong>{{ ticket.assigned_to }}</strong> &nbsp;·&nbsp; {% endif %}
+          🕐 {{ ticket.created_at|date:"d M Y, H:i" }}
+          {% if ticket.resolved_at %} &nbsp;·&nbsp; ✅ {{ ticket.resolved_at|date:"d M Y, H:i" }}{% endif %}
+        </div>
+        {% if ticket.extra_data %}
+        <div class="mt-2">
+          {% for k, v in ticket.extra_data.items %}
+            <span class="kw-tag">{{ k }}: {{ v }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endwith %}
+
+</div><!-- /story-timeline -->
+</div><!-- /tab-story -->
+
+
+<!-- ════════════════
+     TAB: TRANSCRIPT
+════════════════ -->
+<div id="tab-transcript" class="tab-pane">
+  {% if call.transcript %}
+  <div class="transcript-outer">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#fff;">
+        🗒 Full Transcript
+      </span>
+      <span style="font-size:11px;color:var(--muted);">
+        {{ call.duration_seconds }}s · {{ call.started_at|date:"d M Y" }}
+      </span>
+    </div>
+
+    {% if call.transcript.turns %}
+    <div class="transcript-scroll">
+      {% for turn in call.transcript.turns %}
+      <div class="chat-wrap {% if turn.speaker == 'agent' %}agent-side{% else %}customer-side{% endif %}">
+        <div class="chat-bubble">
+          <div class="bubble-meta">
+            {% if turn.speaker == 'agent' %}🤖 Agent{% else %}👤 {{ party.name|default:"Customer" }}{% endif %}
+            {% if turn.timestamp %}<span>{{ turn.timestamp }}s</span>{% endif %}
+          </div>
+          {{ turn.text }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <pre class="transcript-raw">{{ call.transcript.full_text }}</pre>
+    {% endif %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:48px;color:var(--muted);font-size:13px;">
+    No transcript available for this call.
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ════════════════
+     TAB: INSIGHTS
+════════════════ -->
+{% if kpi %}
+<div id="tab-insights" class="tab-pane">
+  <div class="row g-3">
+
+    <!-- Lead Score Breakdown -->
+    <div class="col-md-4">
+      <div class="step-body h-100">
+        <div class="step-title" style="color:var(--green);">Lead Scoring</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+          {% if analysis %}
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Sentiment</span>
+            <span style="font-size:12px;color:var(--green);font-weight:700;">
+              {% if analysis.sentiment == 'positive' %}+20{% elif analysis.sentiment == 'neutral' %}0{% else %}-10{% endif %}
+            </span>
+          </div>
+          {% endif %}
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Questions Score</span>
+            <span style="font-size:12px;color:var(--cyan);font-weight:700;">{{ kpi.questions_score }}/10</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Tone Score</span>
+            <span style="font-size:12px;color:var(--amber);font-weight:700;">{{ kpi.tone_score }}/10</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Length Score</span>
+            <span style="font-size:12px;color:var(--purple);font-weight:700;">{{ kpi.length_score }}/10</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0 0;">
+            <span style="font-size:12px;color:#fff;font-weight:700;">Overall Score</span>
+            <span style="font-size:18px;color:var(--green);font-weight:800;font-family:'Outfit',sans-serif;">
+              {{ kpi.overall_score }}<span style="font-size:11px;opacity:.5;">/10</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Conversion Signal -->
+    {% if analysis and analysis.conversion_probability is not None %}
+    <div class="col-md-4">
+      <div class="step-body h-100">
+        <div class="step-title" style="color:var(--orange);">Conversion Signal</div>
+        <div style="margin-top:12px;">
+          <div style="font-size:3rem;font-weight:800;color:var(--orange);font-family:'Outfit',sans-serif;line-height:1;">
+            {{ analysis.conversion_probability|floatformat:0 }}%
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin:8px 0 14px;text-transform:uppercase;letter-spacing:.07em;">
+            Conversion Probability
+          </div>
+          <div class="conv-bar">
+            <div class="conv-fill" style="width:{{ analysis.conversion_probability|floatformat:0 }}%;background:linear-gradient(90deg,var(--orange),var(--amber));"></div>
+          </div>
+          <div class="conv-label mt-2">
+            {% if analysis.conversion_probability >= 70 %}
+              ✅ High intent — follow up within 24h
+            {% elif analysis.conversion_probability >= 40 %}
+              🔄 Moderate — send nurture content
+            {% else %}
+              ⚠️ Low intent — revisit approach
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Sentiment -->
+    {% if analysis %}
+    <div class="col-md-4">
+      <div class="step-body h-100">
+        <div class="step-title" style="color:var(--purple);">Conversation Quality</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Sentiment</span>
+            <span class="sentiment-badge
+              {% if analysis.sentiment == 'positive' %}sent-positive
+              {% elif analysis.sentiment == 'negative' %}sent-negative
+              {% else %}sent-neutral{% endif %}">
+              {{ analysis.sentiment|title }}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Temperature</span>
+            <span style="font-size:12px;font-weight:700;
+              color:{% if kpi.temperature == 'hot' %}var(--orange){% elif kpi.temperature == 'warm' %}var(--amber){% else %}var(--cyan){% endif %};">
+              {{ kpi.temperature|title }}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Call Duration</span>
+            <span style="font-size:12px;color:#fff;font-weight:700;font-family:'JetBrains Mono',monospace;">{{ call.duration_seconds }}s</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;">
+            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Direction</span>
+            <span style="font-size:12px;color:var(--cyan);font-weight:700;">{{ call.direction|title }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ════════════════
+     TAB: BOLNA
+════════════════ -->
+<div id="tab-bolna" class="tab-pane">
+  <div class="row g-3">
+
+    <div class="col-md-6">
+      <div class="bolna-detail-card">
+        <div class="bolna-header" style="margin-bottom:18px;">
+          <div class="bolna-icon">🎙️</div>
+          <div>
+            <div class="bolna-label">Bolna Voice Agent</div>
+            <div class="bolna-sub">{{ call.call_type|title }} Agent · {{ call.direction|title }}</div>
+          </div>
+          <span class="bolna-status" style="margin-left:auto;">
+            {% if call.status == 'completed' %}✓ DONE{% else %}● LIVE{% endif %}
+          </span>
+        </div>
+
+        <div class="bolna-meta-grid">
+          <div class="bolna-meta-item">
+            <div class="mk">Call ID</div>
+            <div class="mv">{{ call.id|stringformat:"s"|slice:":12"|upper }}</div>
+          </div>
+          <div class="bolna-meta-item">
+            <div class="mk">Type</div>
+            <div class="mv">{{ call.call_type|title }}</div>
+          </div>
+          <div class="bolna-meta-item">
+            <div class="mk">Direction</div>
+            <div class="mv">{{ call.direction|title }}</div>
+          </div>
+          <div class="bolna-meta-item">
+            <div class="mk">Duration</div>
+            <div class="mv">{{ call.duration_seconds }}s</div>
+          </div>
+          <div class="bolna-meta-item">
+            <div class="mk">Status</div>
+            <div class="mv">{{ call.status|title }}</div>
+          </div>
+          <div class="bolna-meta-item">
+            <div class="mk">Started</div>
+            <div class="mv">{{ call.started_at|date:"H:i, d M" }}</div>
+          </div>
+        </div>
+
+        {% if party.phone %}
+        <button class="bolna-recall-btn" onclick="triggerRecall('{{ party.phone }}', '{{ call.call_type }}', '{{ party.name|default:"" }}')">
+          ↗ Re-initiate Call to {{ party.name|default:party.phone }}
+        </button>
+        <div id="bolna-recall-result" style="margin-top:10px;font-size:12px;display:none;"></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Integration flow -->
+    <div class="col-md-6">
+      <div class="step-body h-100">
+        <div class="step-title" style="color:var(--cyan);">Integration Flow</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(0,229,255,0.15);color:var(--cyan);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">Lead form submitted → DB record created</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(167,139,250,0.15);color:var(--purple);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">Bolna API called with phone + agent_id + prompt</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(251,191,36,0.15);color:var(--amber);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">Call initiated · real-time transcript streamed</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(255,107,53,0.15);color:var(--orange);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">4</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">On end → Webhook POST to <code style="color:var(--orange);font-size:11px;">/api/bolna/webhook</code></span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(74,222,128,0.15);color:var(--green);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">5</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">Transcript saved to DB · AI analysis triggered (Celery)</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(74,222,128,0.15);color:var(--green);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">6</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">Lead score + sentiment pushed to dashboard</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <div style="width:22px;height:22px;border-radius:6px;background:rgba(0,229,255,0.15);color:var(--cyan);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">7</div>
+            <span style="font-size:12px;color:#9ab0c8;line-height:1.5;padding-top:3px;">CRM entry / ticket raised via n8n or Make.com</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /tab-bolna -->
+
+
+{% endwith %}
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+  // ── TAB SWITCHING ────────────────────────────────────────────────
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.story-tab').forEach(b => b.classList.remove('active'));
+    const pane = document.getElementById('tab-' + name);
+    if (pane) pane.classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // ── BOLNA RE-CALL ─────────────────────────────────────────────────
+  function triggerRecall(phone, agentType, name) {
+    const btn    = document.querySelector('.bolna-recall-btn');
+    const result = document.getElementById('bolna-recall-result');
+
+    btn.textContent = '⏳ Initiating…';
+    btn.style.opacity = '0.7';
+
+    fetch('/api/bolna/initiate/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({ phone, agent_type: agentType, name }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      result.style.display = 'block';
+      if (data.success) {
+        result.style.color = 'var(--green)';
+        result.textContent = `✓ Call re-initiated. ID: ${data.call_id || 'pending'}`;
+      } else {
+        result.style.color = 'var(--red)';
+        result.textContent = `✗ ${data.error || 'Failed.'}`;
+      }
+    })
+    .catch(() => {
+      result.style.display = 'block';
+      result.style.color   = 'var(--amber)';
+      result.textContent   = '⚠ Could not reach Bolna endpoint.';
+    })
+    .finally(() => {
+      btn.textContent   = '↗ Re-initiate Call to ' + (name || phone);
+      btn.style.opacity = '1';
+    });
+  }
+</script>
+{% endblock %}

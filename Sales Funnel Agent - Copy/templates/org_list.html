@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+{% block title %}Organisations — AOS Agent{% endblock %}
+{% block page_title %}Organisation Management{% endblock %}
+{% block nav_orgs %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── TOP BAR ── */
+  .pg-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+  .filter-pills{display:flex;gap:6px;}
+  .fpill{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:20px;
+    padding:5px 16px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;
+    font-family:var(--font);transition:all .15s;}
+  .fpill:hover,.fpill.active{background:rgba(0,229,255,.08);color:var(--cyan);border-color:rgba(0,229,255,.2);}
+  .new-btn{background:linear-gradient(135deg,var(--cyan),#0088FF);color:#000;border:none;
+    border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;font-family:var(--font);
+    cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+    box-shadow:0 2px 16px rgba(0,229,255,.15);transition:transform .15s,box-shadow .15s;}
+  .new-btn:hover{transform:translateY(-2px);}
+
+  /* ── PENDING REQUESTS TABLE ── */
+  .req-section{background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);
+    border-radius:16px;padding:20px 22px;margin-bottom:22px;}
+  .req-section-title{font-size:13px;font-weight:700;color:#fbbf24;display:flex;align-items:center;
+    gap:8px;margin-bottom:16px;}
+  .req-table{width:100%;border-collapse:collapse;}
+  .req-table th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    font-weight:700;padding:7px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);}
+  .req-table td{padding:10px 12px;font-size:13px;color:#e8ecf1;border-bottom:1px solid rgba(255,255,255,.04);}
+  .req-table tr:last-child td{border-bottom:none;}
+  .req-table tr:hover td{background:rgba(255,255,255,.02);}
+  .req-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* ── ORG CARD ── */
+  .org-card{background:var(--card);border:1px solid var(--border);border-radius:18px;
+    padding:22px 24px;margin-bottom:14px;transition:border-color .2s,transform .2s;}
+  .org-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.1);}
+  .org-card.pending{border-left:3px solid #fbbf24;}
+  .org-card.approved{border-left:3px solid #34d399;}
+  .org-card.rejected{border-left:3px solid #f87171;}
+
+  .oc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;}
+  .oc-title{font-size:17px;font-weight:800;color:#fff;margin-bottom:5px;}
+  .oc-tags{display:flex;gap:6px;flex-wrap:wrap;}
+  .oc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+
+  .oc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;}
+  .oc-stat{background:rgba(255,255,255,.03);border-radius:10px;padding:11px 13px;}
+  .oc-stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;}
+  .oc-stat-val{font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:3px;}
+
+  /* ── LIMITS PANEL ── */
+  .limits-panel{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+    border-radius:12px;padding:16px 18px;margin-top:14px;display:none;}
+  .limits-panel.show{display:block;}
+  .limits-grid{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+  .lim-field{display:flex;flex-direction:column;gap:5px;}
+  .lim-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;}
+  .lim-input{width:82px;background:rgba(255,255,255,.04);border:1px solid var(--border);
+    border-radius:8px;padding:7px 10px;color:#e8ecf1;font-size:13px;
+    font-family:'JetBrains Mono',monospace;text-align:center;outline:none;transition:border-color .15s;}
+  .lim-input:focus{border-color:rgba(167,139,250,.4);}
+  .plan-select{background:rgba(255,255,255,.04);border:1px solid var(--border);
+    border-radius:8px;padding:7px 12px;color:#e8ecf1;font-size:13px;font-family:var(--font);outline:none;}
+  .plan-select option{background:var(--surface);}
+  .save-limits-btn{background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.25);
+    border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);}
+  .save-limits-btn:hover{background:rgba(167,139,250,.22);}
+
+  /* ── QUOTA BARS ── */
+  .quota-row{margin-top:10px;}
+  .quota-meta{display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px;}
+  .quota-meta .q-label{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .quota-meta .q-val{color:#fff;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .q-track{height:5px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden;}
+  .q-fill{height:100%;border-radius:4px;transition:width .6s ease;}
+
+  /* ── BADGE/BUTTON STYLES ── */
+  .bp{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+    padding:3px 10px;border-radius:20px;letter-spacing:.04em;}
+  .bp-green{background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.2);}
+  .bp-amber{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2);}
+  .bp-red{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);}
+  .bp-cyan{background:rgba(0,229,255,.08);color:var(--cyan);border:1px solid rgba(0,229,255,.18);}
+  .bp-purple{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);}
+
+  .act-btn{padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;
+    font-family:var(--font);border:none;transition:all .15s;}
+  .act-approve{background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25);}
+  .act-approve:hover{background:rgba(52,211,153,.22);}
+  .act-reject{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.22);}
+  .act-reject:hover{background:rgba(248,113,113,.2);}
+  .act-ghost{background:rgba(255,255,255,.03);color:var(--muted);border:1px solid var(--border);}
+  .act-ghost:hover{background:rgba(255,255,255,.07);color:#fff;}
+
+  /* ── INLINE LIMITS FOR REQUESTS ── */
+  .req-limits{background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.15);
+    border-radius:10px;padding:12px 14px;margin-top:10px;display:none;}
+  .req-limits.show{display:block;}
+  .req-limits-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+  .req-lim-field{display:flex;flex-direction:column;gap:3px;}
+  .req-lim-label{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;}
+  .req-lim-input{width:76px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+    border-radius:7px;padding:6px 8px;color:#e8ecf1;font-size:12px;
+    font-family:'JetBrains Mono',monospace;text-align:center;outline:none;}
+  .req-lim-input:focus{border-color:rgba(167,139,250,.4);}
+
+  /* ── INLINE CONFIRM BUTTONS ── */
+  .req-act-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .req-act-btn{padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;
+    cursor:pointer;font-family:var(--font);border:none;transition:all .15s;}
+  .req-approve{background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25);}
+  .req-approve:hover{background:rgba(52,211,153,.22);}
+  .req-reject{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.22);}
+  .req-reject:hover{background:rgba(248,113,113,.2);}
+  .req-limits-btn{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);}
+  .req-limits-btn:hover{background:rgba(167,139,250,.2);}
+
+  /* ── MODAL ── */
+  .m-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(10px);
+    z-index:500;display:none;align-items:center;justify-content:center;}
+  .m-overlay.show{display:flex;}
+  .m-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+    padding:32px;width:580px;max-width:94vw;max-height:90vh;overflow-y:auto;animation:mIn .3s ease;}
+  @keyframes mIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  .m-title{font-size:18px;font-weight:800;color:#fff;margin-bottom:24px;}
+  .m-field{margin-bottom:16px;}
+  .m-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);margin-bottom:6px;}
+  .m-input,.m-select{width:100%;background:rgba(255,255,255,.03);border:1px solid var(--border);
+    border-radius:10px;padding:11px 14px;color:#e8ecf1;font-size:14px;
+    font-family:var(--font);outline:none;transition:border-color .15s;}
+  .m-input:focus,.m-select:focus{border-color:rgba(0,229,255,.35);}
+  .m-select option{background:var(--surface);color:#e8ecf1;}
+  .m-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;}
+  .m-cancel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;
+    padding:10px 22px;color:#e8ecf1;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;}
+  .m-save{background:linear-gradient(135deg,var(--cyan),#0088FF);color:#000;border:none;
+    border-radius:10px;padding:10px 26px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;}
+
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:28px;right:28px;background:var(--card);border:1px solid var(--border);
+    border-radius:12px;padding:12px 20px;font-size:13px;font-weight:600;z-index:600;
+    display:none;animation:mIn .3s ease;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# PENDING REQUESTS SECTION #}
+{% if pending_requests %}
+<div class="req-section">
+  <div class="req-section-title">
+    ⏳ Pending Organisation Requests
+    <span style="background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.25);
+      border-radius:20px;padding:2px 10px;font-size:11px;">{{ pending_requests|length }}</span>
+  </div>
+
+  {% for req in pending_requests %}
+  <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+    border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+
+    <!-- Request header info -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:#fff;">{{ req.org_name }}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+          {{ req.contact_name }} &middot; {{ req.admin_email|default:req.contact_email }}
+          &nbsp;&middot;&nbsp; {{ req.get_industry_display|default:req.industry }}
+          &nbsp;&middot;&nbsp; {{ req.created_at|date:"d M Y" }}
+        </div>
+        {% if req.notes %}
+        <div style="font-size:12px;color:#a78bfa;margin-top:4px;font-style:italic;">"{{ req.notes }}"</div>
+        {% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-align:right;">
+        <div>Requested: <strong style="color:#e8ecf1;">{{ req.call_quota }} calls</strong></div>
+        <div>{{ req.minutes_quota }} min / {{ req.number_quota }} numbers</div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="req-act-row">
+      <button class="req-act-btn req-approve" onclick="approveRequest('{{ req.id }}', this)">✓ Approve</button>
+      <button class="req-act-btn req-reject"  onclick="toggleRejectPanel('{{ req.id }}')">✕ Reject</button>
+      <button class="req-act-btn req-limits-btn" onclick="toggleReqLimits('{{ req.id }}')">⚙ Set Limits</button>
+    </div>
+
+    <!-- Inline reject panel (no browser prompt — works everywhere) -->
+    <div class="req-limits" id="req-reject-{{ req.id }}" style="background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.2);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f87171;margin-bottom:8px;">
+        Confirm Rejection
+      </div>
+      <textarea id="reject-note-{{ req.id }}"
+        style="width:100%;background:#0a1520;border:1px solid rgba(248,113,113,.25);border-radius:6px;
+               color:#e8ecf1;padding:8px;font-size:12px;resize:vertical;min-height:56px;"
+        placeholder="Reason for rejection (optional)…"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="req-act-btn req-reject" onclick="confirmReject('{{ req.id }}', this)">✕ Confirm Reject</button>
+        <button class="req-act-btn req-limits-btn" onclick="toggleRejectPanel('{{ req.id }}')">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Inline limits panel (hidden by default) -->
+    <div class="req-limits" id="req-limits-{{ req.id }}">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#a78bfa;margin-bottom:10px;">
+        Customise Quotas before Approving
+      </div>
+      <div class="req-limits-grid">
+        <div class="req-lim-field">
+          <label class="req-lim-label">Call Quota</label>
+          <input type="number" class="req-lim-input" id="rl-calls-{{ req.id }}" value="{{ req.call_quota }}" min="1"/>
+        </div>
+        <div class="req-lim-field">
+          <label class="req-lim-label">Minute Quota</label>
+          <input type="number" class="req-lim-input" id="rl-mins-{{ req.id }}" value="{{ req.minutes_quota }}" min="1"/>
+        </div>
+        <div class="req-lim-field">
+          <label class="req-lim-label">Number Quota</label>
+          <input type="number" class="req-lim-input" id="rl-nums-{{ req.id }}" value="{{ req.number_quota }}" min="1"/>
+        </div>
+        <div class="req-lim-field">
+          <label class="req-lim-label">Max Users</label>
+          <input type="number" class="req-lim-input" id="rl-users-{{ req.id }}" value="{{ req.max_users|default:10 }}" min="1"/>
+        </div>
+        <div class="req-lim-field">
+          <label class="req-lim-label">Plan</label>
+          <select class="req-lim-input" id="rl-plan-{{ req.id }}" style="width:90px;">
+            <option value="trial" {% if req.plan_type == 'trial' %}selected{% endif %}>Trial</option>
+            <option value="starter" {% if req.plan_type == 'starter' %}selected{% endif %}>Starter</option>
+            <option value="pro" {% if req.plan_type == 'pro' %}selected{% endif %}>Pro</option>
+          </select>
+        </div>
+      </div>
+      <button class="req-act-btn req-approve" onclick="approveRequestWithLimits('{{ req.id }}', this)">
+        ✓ Approve with These Limits
+      </button>
+      <span id="rl-msg-{{ req.id }}" style="font-size:11px;margin-left:10px;font-weight:600;"></span>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+{# TOP BAR #}
+<div class="pg-bar">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span style="font-size:12px;color:var(--muted);">{{ orgs|length }} organisation{{ orgs|length|pluralize }}</span>
+    <div class="filter-pills">
+      <button class="fpill active" onclick="filterOrgs(this,'all')">All</button>
+      <button class="fpill" onclick="filterOrgs(this,'approved')">✓ Live</button>
+      <button class="fpill" onclick="filterOrgs(this,'pending')">⏳ Pending</button>
+      <button class="fpill" onclick="filterOrgs(this,'rejected')">✕ Off</button>
+    </div>
+  </div>
+  <button class="new-btn" onclick="document.getElementById('createModal').classList.add('show')">
+    + New Organisation
+  </button>
+</div>
+
+
+{# ORG CARDS #}
+{% for d in org_data %}
+{% with o=d.org %}
+<div class="org-card {% if o.is_approved %}approved{% elif o.is_active %}pending{% else %}rejected{% endif %}"
+     id="org-{{ o.id }}"
+     data-status="{% if o.is_approved %}approved{% elif o.is_active %}pending{% else %}rejected{% endif %}">
+
+  <div class="oc-top">
+    <div>
+      <div class="oc-title">{{ o.name }}</div>
+      <div class="oc-tags">
+        <span class="bp bp-cyan">{{ o.get_industry_display }}</span>
+        <span class="bp {% if o.plan_type == 'pro' %}bp-purple{% elif o.plan_type == 'starter' %}bp-cyan{% else %}bp-amber{% endif %}">
+          {{ o.plan_type|title }}
+        </span>
+        {% if o.is_approved %}
+          <span class="bp bp-green">✓ Live</span>
+        {% elif o.is_active %}
+          <span class="bp bp-amber">⏳ Pending Approval</span>
+        {% else %}
+          <span class="bp bp-red">✕ Deactivated</span>
+        {% endif %}
+        {% if o.approved_by %}<span style="font-size:11px;color:var(--muted);">Approved by {{ o.approved_by }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="oc-actions">
+      {% if not o.is_approved %}
+        <button class="act-btn act-approve" onclick="orgAction('{{ o.id }}','approve',this)">✓ Approve</button>
+        <button class="act-btn act-reject"  onclick="orgAction('{{ o.id }}','reject',this)">✕ Reject</button>
+      {% else %}
+        <button class="act-btn act-reject"  onclick="orgAction('{{ o.id }}','reject',this)">Deactivate</button>
+      {% endif %}
+      <button class="act-btn act-ghost" onclick="toggleLimits('{{ o.id }}')">⚙ Limits</button>
+    </div>
+  </div>
+
+  <!-- Stats grid -->
+  <div class="oc-stats">
+    <div class="oc-stat">
+      <div class="oc-stat-label">Users</div>
+      <div class="oc-stat-val" style="color:var(--cyan);">{{ d.user_count }} / {{ o.max_users }}</div>
+    </div>
+    <div class="oc-stat">
+      <div class="oc-stat-label">Teams</div>
+      <div class="oc-stat-val" style="color:#a78bfa;">{{ d.team_count }} / {{ o.max_teams }}</div>
+    </div>
+    <div class="oc-stat">
+      <div class="oc-stat-label">Calls Used</div>
+      <div class="oc-stat-val" style="color:#34d399;">{{ o.calls_used }} / {{ o.call_quota }}</div>
+    </div>
+    <div class="oc-stat">
+      <div class="oc-stat-label">Minutes Used</div>
+      <div class="oc-stat-val" style="color:#fbbf24;">{{ o.minutes_used }} / {{ o.minutes_quota }}</div>
+    </div>
+    <div class="oc-stat">
+      <div class="oc-stat-label">Numbers</div>
+      <div class="oc-stat-val" style="color:#60a5fa;">{{ d.numbers_used }} / {{ o.number_quota }}</div>
+    </div>
+  </div>
+
+  <!-- Quota bar -->
+  <div class="quota-row">
+    <div class="quota-meta">
+      <span class="q-label">Call Quota</span>
+      <span class="q-val">{{ o.calls_used }} / {{ o.call_quota }}</span>
+    </div>
+    <div class="q-track">
+      {% if o.call_quota > 0 %}
+      <div class="q-fill" style="width:{% widthratio o.calls_used o.call_quota 100 %}%;
+        background:{% if o.calls_used >= o.call_quota %}linear-gradient(90deg,#f87171,#ef4444){% else %}linear-gradient(90deg,#34d399,#10b981){% endif %};">
+      </div>
+      {% endif %}
+    </div>
+    <!-- Call time limit badge -->
+    <div style="margin-left:auto;flex-shrink:0;">
+      {% if o.call_limit_seconds and o.call_limit_seconds > 0 %}
+        <span title="Auto-stops after {{ o.call_limit_seconds }}s with 30s warning"
+              style="display:inline-flex;align-items:center;gap:5px;
+                     background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);
+                     border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;color:#fbbf24;">
+          ⏱ {{ o.call_limit_seconds }}s limit
+        </span>
+      {% else %}
+        <span title="No call time limit set"
+              style="display:inline-flex;align-items:center;gap:5px;
+                     background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+                     border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;color:var(--muted);">
+          ⏱ No limit
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Limits panel (hidden by default, toggled by ⚙ Limits button) -->
+  <div class="limits-panel" id="limits-{{ o.id }}">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px;">
+      ⚙ Edit Limits &amp; Plan
+    </div>
+    <div class="limits-grid">
+      <div class="lim-field"><label class="lim-label">Max Users</label>
+        <input type="number" class="lim-input" id="lu-{{ o.id }}" value="{{ o.max_users }}" min="1"/></div>
+      <div class="lim-field"><label class="lim-label">Max Agents</label>
+        <input type="number" class="lim-input" id="la-{{ o.id }}" value="{{ o.max_agents }}" min="1"/></div>
+      <div class="lim-field"><label class="lim-label">Max Teams</label>
+        <input type="number" class="lim-input" id="lt-{{ o.id }}" value="{{ o.max_teams }}" min="1"/></div>
+      <div class="lim-field"><label class="lim-label">Call Quota</label>
+        <input type="number" class="lim-input" id="lc-{{ o.id }}" value="{{ o.call_quota }}" min="0"/></div>
+      <div class="lim-field"><label class="lim-label">Minute Quota</label>
+        <input type="number" class="lim-input" id="lm-{{ o.id }}" value="{{ o.minutes_quota }}" min="0"/></div>
+      <div class="lim-field"><label class="lim-label">Number Quota</label>
+        <input type="number" class="lim-input" id="ln-{{ o.id }}" value="{{ o.number_quota|default:4 }}" min="0"/></div>
+      <div class="lim-field">
+        <label class="lim-label" title="Call stops automatically after this many seconds. 0 = no limit.">
+          ⏱ Call Time Limit (s)
+        </label>
+        <input type="number" class="lim-input" id="ll-{{ o.id }}"
+               value="{{ o.call_limit_seconds|default:120 }}" min="0"
+               placeholder="120  (0 = no limit)"/>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">
+          {{ o.call_limit_seconds|default:120 }}s = {{ o.call_limit_seconds|default:120|floatformat:0 }} sec
+          &nbsp;·&nbsp; 0 = no limit
+        </div>
+      </div>
+      <div class="lim-field"><label class="lim-label">Plan</label>
+        <select class="plan-select" id="lp-{{ o.id }}">
+          <option value="trial"   {% if o.plan_type == 'trial'   %}selected{% endif %}>Trial</option>
+          <option value="starter" {% if o.plan_type == 'starter' %}selected{% endif %}>Starter</option>
+          <option value="pro"     {% if o.plan_type == 'pro'     %}selected{% endif %}>Pro</option>
+        </select>
+      </div>
+    </div>
+    <button class="save-limits-btn" onclick="saveLimits('{{ o.id }}')">💾 Save Limits</button>
+    <span id="lmsg-{{ o.id }}" style="font-size:11px;margin-left:10px;font-weight:600;"></span>
+  </div>
+
+</div>
+{% endwith %}
+{% empty %}
+<div style="text-align:center;padding:60px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:18px;">
+  No organisations yet. Create the first one!
+</div>
+{% endfor %}
+
+
+{# CREATE ORG MODAL #}
+<div class="m-overlay" id="createModal">
+  <div class="m-box">
+    <div class="m-title">+ New Organisation</div>
+    <form method="POST" action="{% url 'org_create' %}">
+      {% csrf_token %}
+      <div class="m-field">
+        <label class="m-label">Organisation Name *</label>
+        <input class="m-input" name="name" required placeholder="Acme Corp"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="m-field">
+          <label class="m-label">Industry</label>
+          <select class="m-select" name="industry">
+            <option value="real_estate">Real Estate</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="cosmetics">Cosmetics / Retail</option>
+            <option value="apartment">Apartment / Property Mgmt</option>
+            <option value="generic" selected>Generic</option>
+          </select>
+        </div>
+        <div class="m-field">
+          <label class="m-label">Plan</label>
+          <select class="m-select" name="plan_type">
+            <option value="trial" selected>Trial</option>
+            <option value="starter">Starter</option>
+            <option value="pro">Pro</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="m-field">
+          <label class="m-label">Call Quota</label>
+          <input class="m-input" type="number" name="call_quota" value="100" min="1"/>
+        </div>
+        <div class="m-field">
+          <label class="m-label">Minute Quota</label>
+          <input class="m-input" type="number" name="minutes_quota" value="300" min="1"/>
+        </div>
+        <div class="m-field">
+          <label class="m-label">Number Quota</label>
+          <input class="m-input" type="number" name="number_quota" value="4" min="1"/>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;
+        font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);">
+        Bolna Agent IDs (optional)
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="m-field">
+          <label class="m-label">Sales Agent ID</label>
+          <input class="m-input" name="sales_bolna_agent_id" placeholder="UUID from Bolna"/>
+        </div>
+        <div class="m-field">
+          <label class="m-label">Service Agent ID</label>
+          <input class="m-input" name="service_bolna_agent_id" placeholder="UUID from Bolna"/>
+        </div>
+      </div>
+      <div class="m-actions">
+        <button type="button" class="m-cancel" onclick="document.getElementById('createModal').classList.remove('show')">Cancel</button>
+        <button type="submit" class="m-save">Create Organisation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+/* ── Toast ── */
+function showToast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = color;
+  t.style.color = color;
+  t.style.display = 'block';
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.style.display = 'none', 3000);
+}
+
+/* ── Filter org cards ── */
+function filterOrgs(btn, status) {
+  document.querySelectorAll('.fpill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.org-card').forEach(c => {
+    c.style.display = (status === 'all' || c.dataset.status === status) ? '' : 'none';
+  });
+}
+
+/* ── Toggle limits panel on org card ── */
+function toggleLimits(id) {
+  document.getElementById('limits-' + id).classList.toggle('show');
+}
+
+/* ── Toggle limits panel on pending request ── */
+function toggleReqLimits(id) {
+  document.getElementById('req-limits-' + id).classList.toggle('show');
+}
+
+/* ══════════════════════════════════════════
+   ORG CARD: Approve / Reject
+══════════════════════════════════════════ */
+function orgAction(orgId, action, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  fetch('/api/org/' + orgId + '/approve/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ action }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      showToast('✅ ' + d.message, '#34D399');
+      setTimeout(() => location.reload(), 900);
+    } else {
+      showToast('❌ ' + (d.error || 'Failed'), '#F87171');
+      btn.disabled = false;
+      btn.textContent = action === 'approve' ? '✓ Approve' : action === 'reject' ? '✕ Reject' : 'Deactivate';
+    }
+  })
+  .catch(() => {
+    showToast('⚠ Network error', '#FBBF24');
+    btn.disabled = false;
+  });
+}
+
+/* ── Save limits on org card ── */
+function saveLimits(orgId) {
+  const msg = document.getElementById('lmsg-' + orgId);
+  const limitEl = document.getElementById('ll-' + orgId);
+  const payload = {
+    max_users:          parseInt(document.getElementById('lu-' + orgId).value) || 10,
+    max_agents:         parseInt(document.getElementById('la-' + orgId).value) || 5,
+    max_teams:          parseInt(document.getElementById('lt-' + orgId).value) || 3,
+    call_quota:         parseInt(document.getElementById('lc-' + orgId).value) || 100,
+    minutes_quota:      parseInt(document.getElementById('lm-' + orgId).value) || 300,
+    number_quota:       parseInt(document.getElementById('ln-' + orgId).value) || 4,
+    plan_type:          document.getElementById('lp-' + orgId).value,
+    call_limit_seconds: limitEl ? (parseInt(limitEl.value) || 0) : 120,
+  };
+  fetch('/api/org/' + orgId + '/set-limits/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      msg.style.color = '#34D399'; msg.textContent = '✅ Saved';
+      setTimeout(() => location.reload(), 900);
+    } else {
+      msg.style.color = '#f87171'; msg.textContent = '❌ ' + (d.error || 'Failed');
+    }
+  })
+  .catch(() => { msg.style.color = '#fbbf24'; msg.textContent = '⚠ Error'; });
+}
+
+/* ══════════════════════════════════════════
+   REQUEST REVIEW: Approve / Approve-with-limits / Reject
+══════════════════════════════════════════ */
+function _reviewRequest(reqId, action, extraData, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const payload = Object.assign({ action }, extraData || {});
+  fetch('/api/org-requests/' + reqId + '/review/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      if (action === 'approve' && d.admin_email) {
+        showToast(
+          '✅ ' + d.message + ' — Login: ' + d.admin_email + ' / ' + (d.generated_password || 'Test@123'),
+          '#34D399', 8000
+        );
+        setTimeout(() => location.reload(), 8500);
+      } else {
+        showToast('✅ ' + d.message, '#34D399');
+        setTimeout(() => location.reload(), 900);
+      }
+    } else {
+      showToast('❌ ' + (d.error || 'Failed'), '#F87171');
+      if (btn) { btn.disabled = false; btn.textContent = action === 'approve' ? '✓ Approve' : '✕ Reject'; }
+    }
+  })
+  .catch(() => {
+    showToast('⚠ Network error', '#FBBF24');
+    if (btn) btn.disabled = false;
+  });
+}
+
+function approveRequest(reqId, btn) {
+  _reviewRequest(reqId, 'approve', {}, btn);
+}
+
+function approveRequestWithLimits(reqId, btn) {
+  const msg = document.getElementById('rl-msg-' + reqId);
+  const extra = {
+    call_quota:    parseInt(document.getElementById('rl-calls-' + reqId).value) || 100,
+    minutes_quota: parseInt(document.getElementById('rl-mins-'  + reqId).value) || 300,
+    number_quota:  parseInt(document.getElementById('rl-nums-'  + reqId).value) || 4,
+    max_users:     parseInt(document.getElementById('rl-users-' + reqId).value) || 10,
+    plan_type:     document.getElementById('rl-plan-' + reqId).value,
+  };
+  _reviewRequest(reqId, 'approve', extra, btn);
+}
+
+function toggleRejectPanel(id) {
+  const panel = document.getElementById('req-reject-' + id);
+  if (panel) panel.classList.toggle('show');
+}
+
+function confirmReject(reqId, btn) {
+  const note = (document.getElementById('reject-note-' + reqId) || {}).value || '';
+  _reviewRequest(reqId, 'reject', { notes: note }, btn);
+}
+
+function rejectRequest(reqId, btn) {
+  // Legacy fallback — open inline panel instead of prompt()
+  toggleRejectPanel(reqId);
+}
+
+/* ── Close modal on overlay click ── */
+document.querySelectorAll('.m-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+});
+</script>
+{% endblock %}

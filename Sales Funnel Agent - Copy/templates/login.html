@@ -1,0 +1,63 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — AOS Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--cyan:#00E5FF;--bg:#06090F;--surface:#0C1117;--card:#111820;--border:rgba(255,255,255,0.06);--text:#E8ECF1;--muted:#5A6B80}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);font-family:'Outfit',sans-serif;color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+    .bg-glow{position:absolute;width:500px;height:500px;border-radius:50%;filter:blur(120px);opacity:0.07;pointer-events:none}
+    .bg-glow-1{top:-150px;left:-100px;background:var(--cyan)}
+    .bg-glow-2{bottom:-200px;right:-150px;background:#A78BFA}
+    .login-card{position:relative;z-index:1;width:420px;max-width:92vw;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:48px 40px 40px;animation:fadeIn 0.6s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(16px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .login-brand{display:flex;align-items:center;gap:12px;margin-bottom:36px}
+    .login-brand-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--cyan),#0077FF);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#000;box-shadow:0 0 28px rgba(0,229,255,0.2)}
+    .login-brand-text{font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.03em}
+    .login-brand-text span{color:var(--cyan)}
+    .login-subtitle{font-size:14px;color:var(--muted);margin-bottom:32px;font-weight:400;line-height:1.5}
+    .field{margin-bottom:20px}
+    .field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:8px}
+    .field input{width:100%;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-size:15px;font-family:'Outfit',sans-serif;outline:none;transition:border-color 0.2s,background 0.2s}
+    .field input::placeholder{color:rgba(255,255,255,0.2)}
+    .field input:focus{border-color:rgba(0,229,255,0.4);background:rgba(0,229,255,0.03)}
+    .login-btn{width:100%;background:linear-gradient(135deg,var(--cyan),#0077FF);color:#000;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:800;font-family:'Outfit',sans-serif;cursor:pointer;letter-spacing:0.02em;transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 4px 20px rgba(0,229,255,0.2);margin-top:8px}
+    .login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 32px rgba(0,229,255,0.3)}
+    .login-btn:active{transform:translateY(0)}
+    .error-msg{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);color:#f87171;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:20px;text-align:center}
+    .login-footer{text-align:center;margin-top:28px;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-brand-icon">A</div>
+      <div class="login-brand-text">AOS <span>Agent</span></div>
+    </div>
+    <div class="login-subtitle">Sign in to your AI-powered agent platform</div>
+    {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
+    <form method="post" action="{% url 'login' %}">
+      {% csrf_token %}
+      <div class="field">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required autofocus/>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter your password" required/>
+      </div>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+    <div class="login-footer">
+      Don't have an account? <a href="/request-org/" style="color:var(--cyan);text-decoration:none;font-weight:700;">Request Access</a>
+      &nbsp;&middot;&nbsp; AOS Agent Platform
+    </div>
+  </div>
+</body>
+</html>

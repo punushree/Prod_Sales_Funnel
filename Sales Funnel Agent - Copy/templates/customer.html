@@ -1,0 +1,2289 @@
+{% extends "base.html" %}
+{% block title %}Transcript Analysis — AOS Agent{% endblock %}
+{% block page_title %}Transcript Analysis{% endblock %}
+{% block nav_customers %}active{% endblock %}
+{% block extra_css %}
+<style>
+  /* ── GRID LAYOUTS ── */
+  .dash-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .dash-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 900px) {
+    .dash-grid-2,
+    .dash-grid-3 {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ── PANEL CARD ── */
+  .panel-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+
+  /* ── SECTION HEADING ── */
+  .section-head {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #fff;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-head::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── FORM FIELDS ── */
+  .field-group {
+    margin-bottom: 16px;
+  }
+  .field-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #a0b3c6;
+    margin-bottom: 7px;
+  }
+  .field-input,
+  .field-textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 11px 14px;
+    color: #e8f0f8;
+    font-size: 13px;
+    font-family: 'Outfit', sans-serif;
+    outline: none;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
+    box-sizing: border-box;
+  }
+  .field-input::placeholder,
+  .field-textarea::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+  }
+  .field-input:focus,
+  .field-textarea:focus {
+    border-color: rgba(0, 229, 255, 0.45);
+    background: rgba(0, 229, 255, 0.04);
+  }
+  .field-textarea {
+    height: 130px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  /* ── ANALYSE BUTTON ── */
+  .analyse-btn {
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 28px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.06em;
+    transition:
+      transform 0.15s,
+      opacity 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .analyse-btn:hover {
+    transform: translateY(-2px);
+  }
+  .analyse-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .analyse-btn .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .analyse-btn.loading .spinner {
+    display: block;
+  }
+  .analyse-btn.loading .btn-text::after {
+    content: '…';
+  }
+  .status-msg {
+    font-size: 12px;
+    margin-left: 14px;
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition:
+      border-color 0.2s,
+      transform 0.2s;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+  .kpi-card .kpi-glow {
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    filter: blur(24px);
+    opacity: 0.18;
+    pointer-events: none;
+  }
+  .kpi-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #a0b3c6;
+    margin-bottom: 8px;
+  }
+  .kpi-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1;
+    font-family: 'Outfit', sans-serif;
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  /* ── STORY BOX ── */
+  .story-box {
+    background: rgba(0, 229, 255, 0.04);
+    border: 1px solid rgba(0, 229, 255, 0.12);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #c5d8ec;
+  }
+
+  /* ── SCORE BAR ── */
+  .score-wrap {
+    margin-bottom: 10px;
+  }
+  .score-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+  .score-meta .score-key {
+    color: #a0b3c6;
+    font-weight: 600;
+  }
+  .score-meta .score-val {
+    color: #fff;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .score-track {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .score-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.9s ease;
+  }
+
+  /* ── TAGS ── */
+  .tag-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 4px 11px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .tag-intent {
+    background: rgba(0, 229, 255, 0.09);
+    color: var(--cyan);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+  }
+  .tag-signal {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+  }
+  .tag-keyword {
+    background: rgba(255, 255, 255, 0.05);
+    color: #a0b3c6;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── TABLE ── */
+  .table-panel {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .table-panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-panel table {
+    width: 100%;
+  }
+  .table-panel thead th {
+    font-size: 10px;
+    color: #a0b3c6;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 10px 16px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .table-panel tbody td {
+    padding: 10px 16px;
+    font-size: 12px;
+    color: #d0dce8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .table-panel tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .table-panel tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  /* Priority badges */
+  .badge-hot {
+    background: rgba(248, 113, 113, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-warm {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-cold {
+    background: rgba(0, 229, 255, 0.1);
+    color: var(--cyan);
+    border: 1px solid rgba(0, 229, 255, 0.18);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Sentiment badges */
+  .badge-positive {
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-neutral {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-negative {
+    background: rgba(248, 113, 113, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Objection level badge */
+  .badge-obj-low {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-obj-med {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-obj-high {
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-row td {
+    text-align: center;
+    padding: 28px 16px !important;
+    color: var(--muted) !important;
+  }
+
+  /* ── DIVIDER ── */
+  .sub-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #a0b3c6;
+    margin: 14px 0 8px;
+  }
+
+  /* ── SERVICE AGENT CARD ── */
+  .service-card {
+    background: linear-gradient(135deg, #0f1e2e, #0a1520);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    transition: 0.3s;
+  }
+  .service-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 229, 255, 0.25);
+  }
+  .service-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .service-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(0, 229, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .service-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .service-sub {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* Customer dropdown row */
+  .service-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .customer-select {
+    flex: 1;
+    min-width: 220px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #e8f0f8;
+    font-size: 13px;
+    font-family: 'Outfit', sans-serif;
+    outline: none;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
+    appearance: none;
+    cursor: pointer;
+  }
+  .customer-select:focus {
+    border-color: rgba(0, 229, 255, 0.45);
+    background: rgba(0, 229, 255, 0.04);
+  }
+  .customer-select option {
+    background: #0a1520;
+    color: #e8f0f8;
+  }
+
+  /* Selected customer info pill */
+  .selected-customer-info {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 229, 255, 0.05);
+    border: 1px solid rgba(0, 229, 255, 0.15);
+    border-radius: 10px;
+    padding: 9px 14px;
+    margin-bottom: 10px;
+  }
+  .selected-customer-info.visible {
+    display: flex;
+  }
+  .sci-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e8f0f8;
+  }
+  .sci-phone {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--cyan);
+  }
+  .sci-tag {
+    font-size: 10px;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+  .tag-paid {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+  }
+  .tag-free {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+  }
+  .tag-untagged {
+    background: rgba(160, 179, 198, 0.1);
+    color: #a0b3c6;
+    border: 1px solid rgba(160, 179, 198, 0.2);
+  }
+
+  #service-btn {
+    background: linear-gradient(90deg, var(--cyan), #0099ff);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #000;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Outfit', sans-serif;
+    transition:
+      transform 0.15s,
+      opacity 0.15s;
+  }
+  #service-btn:hover {
+    transform: translateY(-1px);
+  }
+  #service-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .loader {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top: 2px solid #000;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  #service-msg {
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* Customer list table inside service card */
+  .customer-table-wrap {
+    margin-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 14px;
+  }
+  .customer-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .customer-mini-table th {
+    font-size: 10px;
+    color: #a0b3c6;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    text-align: left;
+  }
+  .customer-mini-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #d0dce8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+  .customer-mini-table tr:last-child td {
+    border-bottom: none;
+  }
+  .customer-mini-table tr {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .customer-mini-table tr:hover td {
+    background: rgba(0, 229, 255, 0.04);
+  }
+  .customer-mini-table tr.selected td {
+    background: rgba(0, 229, 255, 0.07);
+  }
+
+  /* ── OBJECTION RADAR ── */
+  .objection-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(248, 113, 113, 0.08);
+    border: 1px solid rgba(248, 113, 113, 0.15);
+    color: #f87171;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+  .objection-pill.low {
+    background: rgba(74, 222, 128, 0.08);
+    border-color: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+  }
+  .objection-pill.med {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+  }
+
+  /* ── NEXT ACTION BOX ── */
+  .action-box {
+    background: rgba(127, 119, 221, 0.06);
+    border: 1px solid rgba(127, 119, 221, 0.18);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #c5d8ec;
+    margin-top: 14px;
+  }
+  .action-box strong {
+    color: #a89cf7;
+  }
+
+  /* ── SERVICE DASHBOARD BADGES ── */
+  .badge-critical { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-sev-high { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-sev-medium { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-sev-low { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-immediate { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-urg-high { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-urg-medium { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-urg-low { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-risk-high { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-risk-medium { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-risk-low { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+
+  .badge-cat {
+    background: rgba(167,139,250,0.1);
+    color: #a78bfa;
+    border: 1px solid rgba(167,139,250,0.2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+
+  /* Call type indicator */
+  .type-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+  .type-sales {
+    background: rgba(0,229,255,0.08);
+    color: var(--cyan);
+    border: 1px solid rgba(0,229,255,0.18);
+  }
+  .type-service {
+    background: rgba(167,139,250,0.08);
+    color: #a78bfa;
+    border: 1px solid rgba(167,139,250,0.18);
+  }
+
+  /* Tag styles for service */
+  .tag-issue { background: rgba(248,113,113,0.09); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+  .tag-positive { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .tag-action { background: rgba(167,139,250,0.1); color: #a78bfa; border: 1px solid rgba(167,139,250,0.2); }
+</style>
+{% endblock %} {% block content %}
+
+<!-- ★ NOTICE: Manual transcript input removed per system spec -->
+<div class="alert" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:10px;color:#a5b4fc;" role="alert">
+  <div class="d-flex align-items-center gap-2 mb-1">
+    <i class="bi bi-robot fs-5"></i>
+    <strong>Fully Automated Analysis</strong>
+  </div>
+  <p class="mb-0 small" style="color:#c7d2fe;">
+    Manual transcript input has been <strong>removed</strong>. All call transcripts are now captured automatically
+    when a call ends via the Bolna AI agent. Analysis results appear below in real-time after each call completes.
+    Use the <strong>Call</strong> button on a lead/customer to initiate — everything is handled automatically.
+  </p>
+</div>
+
+
+<!-- ══════════════════════════════
+     SERVICE AGENT CALL
+══════════════════════════════ -->
+<div class="service-card">
+  <div class="service-header">
+    <div class="service-icon">🎧</div>
+    <div>
+      <div class="service-title">Service Agent</div>
+      <div class="service-sub"
+        >Select a customer and trigger a support call</div
+      >
+    </div>
+  </div>
+
+  <!-- Dropdown row -->
+  <div class="service-row">
+    <select
+      class="customer-select"
+      id="customer-select"
+      onchange="onCustomerSelect(this)"
+    >
+      <option value="">— Select a number to call —</option>
+
+      {% if service_customers %}
+        <optgroup label="📋 Customers">
+          {% for c in service_customers %}
+          <option
+            value="{{ c.id }}"
+            data-name="{{ c.name }}"
+            data-phone="{{ c.phone }}"
+            data-tag="{{ c.tag }}"
+          >
+            {{ c.name }} — {{ c.phone }} {% if c.tag == 'paid' %}⭐{% elif c.tag == 'free' %}🆓{% else %}🏷{% endif %}
+          </option>
+          {% endfor %}
+        </optgroup>
+      {% endif %}
+
+      {% if allowed_numbers_for_dropdown %}
+        <optgroup label="☎️ Allowed Numbers">
+          {% for an in allowed_numbers_for_dropdown %}
+          <option
+            value="{{ an.id }}"
+            data-name="{{ an.name }}"
+            data-phone="{{ an.phone }}"
+            data-tag="allowed"
+          >
+            {{ an.name }}{% if an.name != an.phone %} — {{ an.phone }}{% endif %} 📞
+          </option>
+          {% endfor %}
+        </optgroup>
+      {% endif %}
+
+      {% if not service_customers and not allowed_numbers_for_dropdown %}
+        <option disabled>No contacts found — add numbers via Manage → Numbers</option>
+      {% endif %}
+    </select>
+  </div>
+
+  <!-- Selected customer info strip -->
+  <div class="selected-customer-info" id="selected-info">
+    <div>
+      <div class="sci-name" id="sci-name">—</div>
+      <div class="sci-phone" id="sci-phone">—</div>
+    </div>
+    <span class="sci-tag" id="sci-tag">—</span>
+    <div style="flex: 1"></div>
+    <button id="service-btn" onclick="callServiceAgent()" disabled>
+      <span id="btn-text">📞 Call Now</span>
+      <span id="btn-loader" class="loader" style="display: none"></span>
+    </button>
+  </div>
+
+  <div id="service-msg"></div>
+
+  <!-- Customer list table -->
+  <div class="customer-table-wrap">
+    <div
+      style="
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #a0b3c6;
+        margin-bottom: 10px;
+      "
+    >
+      📋 All Customers
+    </div>
+    <table class="customer-mini-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Tag</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in service_customers %}
+        <tr
+          onclick="selectCustomerFromTable('{{ c.id }}', '{{ c.name }}', '{{ c.phone }}', '{{ c.tag }}')"
+          id="row-{{ c.id }}"
+        >
+          <td style="font-weight: 600; color: #e8f0f8">{{ c.name }}</td>
+          <td
+            style="font-family: 'JetBrains Mono', monospace; color: var(--cyan)"
+            >{{ c.phone }}</td
+          >
+          <td>
+            <span class="sci-tag tag-{{ c.tag }}">
+              {% if c.tag == 'paid' %}⭐ Paid {% elif c.tag == 'free' %}🆓 Free
+              {% else %}🏷 Untagged{% endif %}
+            </span>
+          </td>
+          <td>
+            <button
+              onclick="event.stopPropagation(); quickCall('{{ c.phone }}', '{{ c.name }}')"
+              style="
+                background: rgba(0, 229, 255, 0.1);
+                border: 1px solid rgba(0, 229, 255, 0.2);
+                color: var(--cyan);
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+              "
+            >
+              📞 Call
+            </button>
+          </td>
+        </tr>
+        {% empty %}
+        {% if allowed_numbers_for_dropdown %}
+          {% for an in allowed_numbers_for_dropdown %}
+          <tr
+            onclick="selectCustomerFromTable('{{ an.id }}', '{{ an.name }}', '{{ an.phone }}', 'allowed')"
+            id="row-{{ an.id }}"
+            style="cursor:pointer;"
+          >
+            <td style="font-weight: 600; color: #e8f0f8">{{ an.name }}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: var(--cyan)">{{ an.phone }}</td>
+            <td>
+              <span class="sci-tag" style="background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.2);padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;">
+                ☎️ Allowed
+              </span>
+            </td>
+            <td>
+              <button
+                onclick="event.stopPropagation(); quickCall('{{ an.phone }}', '{{ an.name }}')"
+                style="background: rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.2);color:var(--cyan);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;"
+              >
+                📞 Call
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+        <tr>
+          <td colspan="4" style="text-align:center;color:var(--muted);padding:20px">
+            No contacts found. Add numbers via
+            <a href="/manage/numbers/" style="color:var(--cyan);">Manage → Numbers</a>.
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     POST-CALL ANALYSIS MODAL
+     Full-screen overlay shown after service call is initiated.
+     4 stages: Call → Save Transcript → Feedback Agent → Dashboard
+══════════════════════════════ -->
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulseGlow {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,0.0); }
+    50%      { box-shadow: 0 0 28px 6px rgba(0,229,255,0.14); }
+  }
+  @keyframes fadeSlideIn {
+    from { opacity:0; transform:translateY(20px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes iconPulse {
+    0%,100% { transform: scale(1); }
+    50%     { transform: scale(1.15); }
+  }
+
+  /* Step Pills */
+  .pca-step-pill {
+    display:inline-flex;align-items:center;gap:5px;
+    padding:5px 13px;border-radius:20px;font-size:11px;
+    font-weight:600;letter-spacing:0.3px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.07);
+    color:#3d4a58;transition:all 0.45s ease;
+  }
+  .pca-step-pill.active {
+    background:rgba(0,229,255,0.1);
+    border-color:rgba(0,229,255,0.32);
+    color:#00e5ff;
+    box-shadow:0 0 10px rgba(0,229,255,0.12);
+  }
+  .pca-step-pill.done {
+    background:rgba(0,229,160,0.09);
+    border-color:rgba(0,229,160,0.28);
+    color:#00e5a0;
+  }
+  .pca-step-pill.done::before { content:"✓ "; }
+
+  /* Modal backdrop */
+  #analysisModal {
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.78);
+    backdrop-filter:blur(7px);
+    -webkit-backdrop-filter:blur(7px);
+    z-index:9999;display:none;
+    align-items:center;justify-content:center;
+  }
+  #analysisModal.open { display:flex; }
+
+  /* Modal card */
+  .pca-modal-card {
+    background:#0d1117;
+    border:1px solid rgba(0,229,255,0.16);
+    border-radius:20px;padding:40px 36px 30px;
+    max-width:490px;width:92%;text-align:center;
+    animation:fadeSlideIn 0.35s ease both, pulseGlow 3.5s ease-in-out infinite;
+  }
+
+  /* Icon */
+  #modal-icon {
+    font-size:54px;display:block;
+    margin-bottom:14px;line-height:1;
+    animation:iconPulse 2s ease-in-out infinite;
+  }
+
+  /* Progress track */
+  .pca-progress-track {
+    background:#1a2030;border-radius:99px;
+    height:6px;overflow:hidden;margin:20px 0 13px;
+  }
+  #modal-progress {
+    height:100%;width:8%;
+    background:linear-gradient(90deg,#00e5ff,#00e5a0);
+    border-radius:99px;
+    transition:width 0.9s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* Transcript snippet */
+  #modal-transcript {
+    display:none;margin-top:16px;
+    background:#080d14;
+    border:1px solid rgba(0,229,255,0.09);
+    border-radius:10px;padding:12px 14px;
+    text-align:left;font-size:11px;
+    color:#3d5060;max-height:76px;
+    overflow:hidden;font-family:monospace;
+    line-height:1.65;position:relative;
+  }
+  #modal-transcript::after {
+    content:"";position:absolute;
+    bottom:0;left:0;right:0;height:26px;
+    background:linear-gradient(to bottom,transparent,#080d14);
+  }
+
+  /* Dismiss button */
+  .pca-modal-dismiss {
+    margin-top:22px;background:transparent;
+    border:1px solid rgba(255,255,255,0.08);
+    color:#4b5563;padding:8px 22px;
+    border-radius:8px;cursor:pointer;
+    font-size:11px;transition:all 0.2s;
+  }
+  .pca-modal-dismiss:hover {
+    border-color:rgba(255,255,255,0.18);color:#9ca3af;
+  }
+</style>
+
+<div id="analysisModal">
+  <div class="pca-modal-card">
+    <span id="modal-icon">📞</span>
+    <h3 id="modal-title"
+        style="color:#e2e8f0;font-size:19px;font-weight:700;margin:0 0 6px;">
+      Service Call Active
+    </h3>
+    <p id="modal-subtitle"
+       style="color:#64748b;font-size:13px;margin:0 0 20px;line-height:1.5;">
+      Conversation in progress…
+    </p>
+
+    <!-- Pipeline steps -->
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;">
+      <span id="modal-step-1" class="pca-step-pill active">1. Call</span>
+      <span id="modal-step-2" class="pca-step-pill">2. Save Transcript</span>
+      <span id="modal-step-3" class="pca-step-pill">3. Feedback Agent</span>
+      <span id="modal-step-4" class="pca-step-pill">4. Dashboard</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="pca-progress-track">
+      <div id="modal-progress"></div>
+    </div>
+
+    <!-- Live status -->
+    <p id="modal-status"
+       style="color:#00e5ff;font-size:12px;font-weight:600;
+              font-family:monospace;letter-spacing:0.4px;min-height:18px;">
+      📞 Call placed — waiting for agent conversation…
+    </p>
+
+    <!-- Transcript preview (stage 2+) -->
+    <div id="modal-transcript"></div>
+
+    <button class="pca-modal-dismiss" onclick="closeAnalysisModal()">
+      Close &nbsp;·&nbsp; Results will appear in the Calls page
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     CUSTOMER STORY
+══════════════════════════════ -->
+<div id="storyBox" class="panel-card" style="display: none">
+  <div class="section-head">🧠 Customer Story</div>
+  <div class="story-box" id="storyText"></div>
+  <div class="action-box" id="nextActionBox" style="display: none">
+    <strong>💡 Recommended Next Action:</strong>
+    <span id="nextActionText"></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     KPI GRID — 6 dynamic cards
+     1. Lead Score (weighted)
+     2. Sentiment (Positive/Neutral/Negative)
+     3. Priority (Hot/Warm/Cold)
+     4. Engagement %
+     5. Conversion Likelihood %
+     6. Objection Level
+══════════════════════════════ -->
+<div id="kpiBox" class="dash-grid-3" style="display: none">
+  <div class="kpi-card">
+    <div class="kpi-glow" id="scoreGlow" style="background: var(--cyan)"></div>
+    <div class="kpi-label">📊 Lead Score</div>
+    <div class="kpi-value" id="kpi-score">—</div>
+    <div class="kpi-sub">out of 100</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="sentGlow" style="background: #4ade80"></div>
+    <div class="kpi-label">😊 Sentiment</div>
+    <div class="kpi-value" id="kpi-sentiment" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-sentiment-sub"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="priorityGlow" style="background: #f87171"></div>
+    <div class="kpi-label">🚦 Priority</div>
+    <div class="kpi-value" id="kpi-priority" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-priority-sub"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background: #7f77dd"></div>
+    <div class="kpi-label">⚡ Engagement</div>
+    <div class="kpi-value" id="kpi-engagement">—</div>
+    <div class="kpi-sub">% interest level</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background: #1d9e75"></div>
+    <div class="kpi-label">🎯 Conversion Likelihood</div>
+    <div class="kpi-value" id="kpi-conversion">—</div>
+    <div class="kpi-sub">% closing chance</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="objGlow" style="background: #f87171"></div>
+    <div class="kpi-label">🚧 Objection Level</div>
+    <div class="kpi-value" id="kpi-objection" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-objection-sub"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     SCORES + TAGS (2-col) — SALES only
+══════════════════════════════ -->
+<div id="detailBox" class="dash-grid-2" style="display: none">
+  <!-- Score Bars -->
+  <div class="panel-card">
+    <div class="section-head">📈 Score Breakdown</div>
+
+    <div class="score-wrap">
+      <div class="score-meta">
+        <span class="score-key">Engagement (Interest)</span>
+        <span class="score-val" id="bar-f1-val">0%</span>
+      </div>
+      <div class="score-track"
+        ><div
+          class="score-fill"
+          id="bar-f1"
+          style="width: 0%; background: #7f77dd"
+        ></div
+      ></div>
+    </div>
+
+    <div class="score-wrap">
+      <div class="score-meta">
+        <span class="score-key">Product Fit</span>
+        <span class="score-val" id="bar-f2-val">0%</span>
+      </div>
+      <div class="score-track"
+        ><div
+          class="score-fill"
+          id="bar-f2"
+          style="width: 0%; background: #1d9e75"
+        ></div
+      ></div>
+    </div>
+
+    <div class="score-wrap">
+      <div class="score-meta">
+        <span class="score-key">Conversion Likelihood</span>
+        <span class="score-val" id="bar-f3-val">0%</span>
+      </div>
+      <div class="score-track"
+        ><div
+          class="score-fill"
+          id="bar-f3"
+          style="width: 0%; background: #ba7517"
+        ></div
+      ></div>
+    </div>
+
+    <div
+      class="score-wrap"
+      style="
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      "
+    >
+      <div class="score-meta">
+        <span class="score-key">Overall Lead Score (weighted)</span>
+        <span class="score-val" id="bar-score-val">0 / 100</span>
+      </div>
+      <div class="score-track"
+        ><div
+          class="score-fill"
+          id="bar-score"
+          style="width: 0%; background: var(--cyan)"
+        ></div
+      ></div>
+    </div>
+  </div>
+
+  <!-- Tags: Intents + Signals -->
+  <div class="panel-card">
+    <div class="section-head">🎯 Intents & Signals</div>
+    <div class="sub-label">Detected Intents</div>
+    <div class="tag-group" id="intents">
+      <span class="tag tag-keyword" style="color: rgba(255, 255, 255, 0.2)"
+        >Will appear after analysis</span
+      >
+    </div>
+    <div class="sub-label" style="margin-top: 16px">Buying Signals</div>
+    <div class="tag-group" id="signals">
+      <span class="tag tag-keyword" style="color: rgba(255, 255, 255, 0.2)"
+        >Will appear after analysis</span
+      >
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     ★ SERVICE DASHBOARD — KPI GRID (6 cards)
+     Shown only for existing customer transcripts
+══════════════════════════════════════════════════════════════════ -->
+<div id="serviceKpiBox" class="dash-grid-3" style="display: none">
+  <div class="kpi-card">
+    <div class="kpi-glow" id="satGlow" style="background: #4ade80"></div>
+    <div class="kpi-label">😊 Customer Satisfaction</div>
+    <div class="kpi-value" id="kpi-satisfaction">—</div>
+    <div class="kpi-sub">out of 100</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="sevGlow" style="background: #f87171"></div>
+    <div class="kpi-label">🔥 Issue Severity</div>
+    <div class="kpi-value" id="kpi-severity" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-severity-sub"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="urgGlow" style="background: #fbbf24"></div>
+    <div class="kpi-label">⏱ Resolution Urgency</div>
+    <div class="kpi-value" id="kpi-urgency" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-urgency-sub"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="loyaltyGlow" style="background: #f87171"></div>
+    <div class="kpi-label">⚠️ Loyalty Risk</div>
+    <div class="kpi-value" id="kpi-loyalty" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-loyalty-sub"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" style="background: #a78bfa"></div>
+    <div class="kpi-label">📂 Issue Category</div>
+    <div class="kpi-value" id="kpi-category" style="font-size: 1.1rem; text-transform: capitalize">—</div>
+    <div class="kpi-sub" id="kpi-category-sub"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-glow" id="svcSentGlow" style="background: #4ade80"></div>
+    <div class="kpi-label">💬 Sentiment</div>
+    <div class="kpi-value" id="kpi-svc-sentiment" style="font-size: 1.1rem">—</div>
+    <div class="kpi-sub" id="kpi-svc-sentiment-sub"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     SERVICE DETAIL: Issues + Actions (2-col)
+══════════════════════════════ -->
+<div id="serviceDetailBox" class="dash-grid-2" style="display: none">
+  <!-- Satisfaction bar + breakdown -->
+  <div class="panel-card">
+    <div class="section-head">📊 Satisfaction Breakdown</div>
+    <div class="score-wrap">
+      <div class="score-meta">
+        <span class="score-key">Customer Satisfaction</span>
+        <span class="score-val" id="bar-sat-val">0%</span>
+      </div>
+      <div class="score-track">
+        <div class="score-fill" id="bar-sat" style="width: 0%; background: #4ade80"></div>
+      </div>
+    </div>
+    <div class="sub-label" style="margin-top: 16px">Issues Raised</div>
+    <div class="tag-group" id="issues-raised">
+      <span class="tag tag-keyword" style="color: rgba(255,255,255,0.2)">Will appear after analysis</span>
+    </div>
+    <div class="sub-label" style="margin-top: 16px">Positive Notes</div>
+    <div class="tag-group" id="positive-notes">
+      <span class="tag tag-keyword" style="color: rgba(255,255,255,0.2)">Will appear after analysis</span>
+    </div>
+  </div>
+
+  <!-- Action items -->
+  <div class="panel-card">
+    <div class="section-head">🛠 Action Items</div>
+    <div class="tag-group" id="action-items" style="flex-direction: column; gap: 10px">
+      <span class="tag tag-keyword" style="color: rgba(255,255,255,0.2)">Will appear after analysis</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     ★ MIXED CASE — SERVICE → SALES TRANSFER BANNER
+     Shown only when routing_type = service_then_sales
+══════════════════════════════════════════════════════════════════ -->
+<div id="transferBanner" class="panel-card" style="display:none; border-color: rgba(251,191,36,0.25); background: linear-gradient(135deg, #1a1a0a, #0f1e2e);">
+  <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+    <div style="width:42px;height:42px;border-radius:12px;background:rgba(251,191,36,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;">🔀</div>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:#fbbf24;">Mixed Case Detected — Service → Sales Transfer</div>
+      <div style="font-size:11px;color:var(--muted);">Customer has an issue AND wants new product info. Handle issue first, then transfer to sales.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:200px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15);border-radius:12px;padding:14px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#a78bfa;margin-bottom:8px;">Step 1 — Service Agent</div>
+      <div style="font-size:12px;color:#c5d8ec;line-height:1.5;" id="transferStep1">Resolve customer issue first</div>
+    </div>
+    <div style="display:flex;align-items:center;color:var(--muted);font-size:18px;">→</div>
+    <div style="flex:1;min-width:200px;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.15);border-radius:12px;padding:14px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--cyan);margin-bottom:8px;">Step 2 — Sales Agent Transfer</div>
+      <div style="font-size:12px;color:#c5d8ec;line-height:1.5;" id="transferStep2">"I'll connect you to our product specialist"</div>
+    </div>
+  </div>
+  <!-- Mixed case shows BOTH sets of KPIs in a compact view -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+    <div style="background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.1);border-radius:10px;padding:12px;">
+      <div style="font-size:10px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Service KPIs</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div><span style="font-size:10px;color:var(--muted);">Satisfaction</span><br><span style="font-size:16px;font-weight:700;" id="mix-satisfaction">—</span></div>
+        <div><span style="font-size:10px;color:var(--muted);">Severity</span><br><span style="font-size:12px;font-weight:700;" id="mix-severity">—</span></div>
+        <div><span style="font-size:10px;color:var(--muted);">Urgency</span><br><span style="font-size:12px;font-weight:700;" id="mix-urgency">—</span></div>
+        <div><span style="font-size:10px;color:var(--muted);">Loyalty Risk</span><br><span style="font-size:12px;font-weight:700;" id="mix-loyalty">—</span></div>
+      </div>
+    </div>
+    <div style="background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.1);border-radius:10px;padding:12px;">
+      <div style="font-size:10px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Sales KPIs (after transfer)</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div><span style="font-size:10px;color:var(--muted);">Lead Score</span><br><span style="font-size:16px;font-weight:700;" id="mix-leadscore">—</span></div>
+        <div><span style="font-size:10px;color:var(--muted);">Engagement</span><br><span style="font-size:12px;font-weight:700;" id="mix-engagement">—</span></div>
+        <div><span style="font-size:10px;color:var(--muted);">Conversion</span><br><span style="font-size:12px;font-weight:700;" id="mix-conversion">—</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     RECENT SALES CALLS TABLE
+══════════════════════════════ -->
+<div class="table-panel">
+  <div class="table-panel-header">
+    <div class="section-head" style="margin: 0">📞 Recent Sales Calls <span class="type-indicator type-sales">New Prospects</span></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Priority</th>
+        <th>Sentiment</th>
+        <th>Objection Level</th>
+        <th>Est. Call Cost</th>
+      </tr>
+    </thead>
+    <tbody id="calls">
+      <tr class="empty-row"><td colspan="5">No sales calls analysed yet</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════
+     RECENT LEADS TABLE  (only high-score entries)
+══════════════════════════════ -->
+<div class="table-panel">
+  <div class="table-panel-header">
+    <div class="section-head" style="margin: 0"
+      >⭐ Recent Leads
+      <span
+        style="
+          font-size: 10px;
+          color: var(--muted);
+          font-weight: 400;
+          margin-left: 8px;
+        "
+        >(Lead Score ≥ 60)</span
+      ></div
+    >
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Lead Score</th>
+        <th>Engagement</th>
+        <th>Conversion Likelihood</th>
+        <th>Next Action</th>
+      </tr>
+    </thead>
+    <tbody id="leads">
+      <tr class="empty-row"><td colspan="5">No qualified leads yet</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════
+     RECENT SERVICE CALLS TABLE
+══════════════════════════════ -->
+<div class="table-panel">
+  <div class="table-panel-header">
+    <div class="section-head" style="margin: 0">🛠 Recent Service Calls <span class="type-indicator type-service">Existing Customers</span></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Satisfaction</th>
+        <th>Issue Severity</th>
+        <th>Resolution Urgency</th>
+        <th>Loyalty Risk</th>
+        <th>Category</th>
+      </tr>
+    </thead>
+    <tbody id="service-calls">
+      <tr class="empty-row"><td colspan="6">No service calls analysed yet</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════
+     MIXED CASE (SERVICE → SALES) TABLE
+══════════════════════════════ -->
+<div class="table-panel">
+  <div class="table-panel-header">
+    <div class="section-head" style="margin: 0">🔀 Mixed Cases <span style="background:rgba(251,191,36,0.08);color:#fbbf24;border:1px solid rgba(251,191,36,0.18);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;">Service → Sales Transfer</span></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Satisfaction</th>
+        <th>Issue Severity</th>
+        <th>Lead Score</th>
+        <th>Sentiment</th>
+        <th>Route</th>
+      </tr>
+    </thead>
+    <tbody id="mixed-calls">
+      <tr class="empty-row"><td colspan="6">No mixed cases yet</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% endblock %} {% block extra_js %}
+<script>
+  /* ══════════════════════════════════════════════════════════════════
+     DUAL DASHBOARD JS — Sales + Service
+     Auto-detects call_type from analysis response and shows the
+     correct dashboard, KPIs, and history table.
+  ══════════════════════════════════════════════════════════════════ */
+
+  /* ── Call cost estimator ── */
+  function _estCallCost(temperature) {
+    const ratePerMin = 1.5;
+    const avgMins = { 'Hot': 5, 'Warm': 3, 'Cold': 2 };
+    const mins = avgMins[temperature] || 3;
+    const cost = (ratePerMin * mins).toFixed(1);
+    const color = temperature === 'Hot' ? '#f87171' : temperature === 'Warm' ? '#fbbf24' : '#4ade80';
+    return { text: `₹${cost} (~${mins} min)`, color };
+  }
+
+  /* ── HTML escape ── */
+  function _e(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SALES — history builders (same as before)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _buildCallRow(h) {
+    const priMap = {
+      'Hot':  { cls: 'badge-hot',  label: '🔴 High'   },
+      'Warm': { cls: 'badge-warm', label: '🟡 Medium' },
+      'Cold': { cls: 'badge-cold', label: '🔵 Low'    },
+    };
+    const sentMap = {
+      'positive': { cls: 'badge-positive', label: '😊 Positive' },
+      'neutral':  { cls: 'badge-neutral',  label: '😐 Neutral'  },
+      'negative': { cls: 'badge-negative', label: '😟 Negative' },
+    };
+    const objMap = {
+      'Hot':  { cls: 'badge-obj-low', label: '✅ Low'    },
+      'Warm': { cls: 'badge-obj-med', label: '⚠️ Medium' },
+      'Cold': { cls: 'badge-obj-high',label: '🚫 High'   },
+    };
+    const pri  = priMap[h.temperature]  || priMap['Cold'];
+    const sent = sentMap[h.sentiment]   || sentMap['neutral'];
+    const obj  = objMap[h.temperature]  || objMap['Cold'];
+    const cost = _estCallCost(h.temperature);
+    // FIX: show phone number if name is blank/unknown
+    const displayName = (h.phone && (!h.name || h.name === 'Unknown')) ? h.phone : _e(h.name || h.phone || '—');
+    return `<tr>
+      <td style="font-weight:600;color:#e8f0f8;">${displayName}</td>
+      <td><span class="${pri.cls}">${pri.label}</span></td>
+      <td><span class="${sent.cls}">${sent.label}</span></td>
+      <td><span class="${obj.cls}">${obj.label}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${cost.color};font-size:11px;">${cost.text}</td>
+    </tr>`;
+  }
+
+  function _buildLeadRow(h) {
+    const scoreColor = h.lead_score >= 70 ? '#4ade80' : h.lead_score >= 45 ? '#fbbf24' : '#f87171';
+    const engPct   = Math.min(100, Math.round(h.lead_score * 1.1));
+    const engColor = engPct >= 65 ? '#4ade80' : engPct >= 40 ? '#fbbf24' : '#f87171';
+    const convPct   = Math.max(0, Math.round(h.lead_score * 0.85));
+    const convColor = convPct >= 65 ? '#4ade80' : convPct >= 35 ? '#fbbf24' : '#f87171';
+    const nextMap = { 'Hot': '🚀 Send proposal now', 'Warm': '📅 Schedule follow-up', 'Cold': '📧 Add to drip campaign' };
+    const next = nextMap[h.temperature] || '📧 Add to drip campaign';
+    // FIX: show phone number if name is blank/unknown
+    const displayName = (h.phone && (!h.name || h.name === 'Unknown')) ? h.phone : _e(h.name || h.phone || '—');
+    return `<tr>
+      <td style="font-weight:600;color:#e8f0f8;">${displayName}</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${scoreColor};">${h.lead_score} <span style="font-size:10px;color:var(--muted)">/ 100</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${engColor};">${engPct}%</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${convColor};">${convPct}%</td>
+      <td style="font-size:11px;color:#a0b3c6;">${next}</td>
+    </tr>`;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SERVICE — history builder (NEW)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _buildServiceRow(h) {
+    const satColor = h.satisfaction >= 70 ? '#4ade80' : h.satisfaction >= 40 ? '#fbbf24' : '#f87171';
+    const sevMap = {
+      'Critical':  { cls: 'badge-critical',   label: '🔴 Critical' },
+      'High':      { cls: 'badge-sev-high',   label: '🟠 High'     },
+      'Medium':    { cls: 'badge-sev-medium',  label: '🟡 Medium'   },
+      'Low':       { cls: 'badge-sev-low',     label: '🟢 Low'      },
+    };
+    const urgMap = {
+      'Immediate': { cls: 'badge-immediate',   label: '🔴 Immediate' },
+      'High':      { cls: 'badge-urg-high',    label: '🟠 High'      },
+      'Medium':    { cls: 'badge-urg-medium',   label: '🟡 Medium'    },
+      'Low':       { cls: 'badge-urg-low',      label: '🟢 Low'       },
+    };
+    const riskMap = {
+      'High':   { cls: 'badge-risk-high',   label: '🔴 High'   },
+      'Medium': { cls: 'badge-risk-medium', label: '🟡 Medium' },
+      'Low':    { cls: 'badge-risk-low',    label: '🟢 Low'    },
+    };
+    const sev  = sevMap[h.issue_severity]      || sevMap['Medium'];
+    const urg  = urgMap[h.resolution_urgency]  || urgMap['Medium'];
+    const risk = riskMap[h.loyalty_risk]       || riskMap['Medium'];
+    const catIcons = { maintenance:'🔧', billing:'💳', complaint:'😤', query:'❓', feedback:'💬', escalation:'📢', other:'📋' };
+    const catIcon = catIcons[h.issue_category] || '📋';
+    // FIX: show phone number if name is blank/unknown
+    const displayName = (h.phone && (!h.name || h.name === 'Unknown')) ? h.phone : _e(h.name || h.phone || '—');
+
+    return `<tr>
+      <td style="font-weight:600;color:#e8f0f8;">${displayName}</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${satColor};">${h.satisfaction}%</td>
+      <td><span class="${sev.cls}">${sev.label}</span></td>
+      <td><span class="${urg.cls}">${urg.label}</span></td>
+      <td><span class="${risk.cls}">${risk.label}</span></td>
+      <td><span class="badge-cat">${catIcon} ${_e(h.issue_category)}</span></td>
+    </tr>`;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     MIXED — history builder (service_then_sales)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _buildMixedRow(h) {
+    const satColor = (h.satisfaction||50) >= 70 ? '#4ade80' : (h.satisfaction||50) >= 40 ? '#fbbf24' : '#f87171';
+    const scoreColor = (h.lead_score||0) >= 70 ? '#4ade80' : (h.lead_score||0) >= 45 ? '#fbbf24' : '#f87171';
+    const sevMap = {
+      'Critical': { cls: 'badge-critical', label: '🔴 Critical' },
+      'High':     { cls: 'badge-sev-high', label: '🟠 High' },
+      'Medium':   { cls: 'badge-sev-medium', label: '🟡 Medium' },
+      'Low':      { cls: 'badge-sev-low', label: '🟢 Low' },
+    };
+    const sentMap = {
+      'positive': { cls: 'badge-positive', label: '😊 Positive' },
+      'neutral':  { cls: 'badge-neutral',  label: '😐 Neutral' },
+      'negative': { cls: 'badge-negative', label: '😟 Negative' },
+    };
+    const sev  = sevMap[h.issue_severity] || sevMap['Medium'];
+    const sent = sentMap[h.sentiment]     || sentMap['neutral'];
+
+    return `<tr>
+      <td style="font-weight:600;color:#e8f0f8;">${_e(h.name)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${satColor};">${h.satisfaction||50}%</td>
+      <td><span class="${sev.cls}">${sev.label}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${scoreColor};">${h.lead_score||0} <span style="font-size:10px;color:var(--muted)">/ 100</span></td>
+      <td><span class="${sent.cls}">${sent.label}</span></td>
+      <td><span style="background:rgba(251,191,36,0.08);color:#fbbf24;border:1px solid rgba(251,191,36,0.18);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;">🔀 Svc→Sales</span></td>
+    </tr>`;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SEED FROM DB — Django context
+  ════════════════════════════════════════════════════════════════ */
+
+  const _callHistory    = {{ call_history|safe }}.map(_buildCallRow);
+  const _leadHistory    = {{ leads_history|safe }}.map(_buildLeadRow);
+  const _serviceHistory = {{ service_history|safe }}.map(_buildServiceRow);
+  const _mixedHistory   = {{ mixed_history|safe }}.map(_buildMixedRow);
+
+  (function _initTables() {
+    const callsEl   = document.getElementById('calls');
+    const leadsEl   = document.getElementById('leads');
+    const svcEl     = document.getElementById('service-calls');
+    const mixEl     = document.getElementById('mixed-calls');
+    if (_callHistory.length)    callsEl.innerHTML   = _callHistory.join('');
+    if (_leadHistory.length)    leadsEl.innerHTML    = _leadHistory.join('');
+    if (_serviceHistory.length) svcEl.innerHTML      = _serviceHistory.join('');
+    if (_mixedHistory.length)   mixEl.innerHTML      = _mixedHistory.join('');
+  })();
+
+  /* ════════════════════════════════════════════════════════════════
+     SALES — KPI helpers (same as before)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _calcLeadScore(f1, f2, f3) {
+    return Math.round((f1 * 0.40) + (f2 * 0.35) + (f3 * 0.25));
+  }
+
+  function _sentimentInfo(pos) {
+    if (pos >= 60) return { label: '😊 Positive', color: '#4ade80', sub: 'Buyer is upbeat & engaged', glowColor: '#4ade80', badgeClass: 'badge-positive' };
+    if (pos >= 35) return { label: '😐 Neutral',  color: '#fbbf24', sub: 'Mixed or cautious tone',   glowColor: '#fbbf24', badgeClass: 'badge-neutral'  };
+    return             { label: '😟 Negative', color: '#f87171', sub: 'Buyer seems hesitant/cold', glowColor: '#f87171', badgeClass: 'badge-negative' };
+  }
+
+  function _priorityInfo(is_hot, is_warm) {
+    if (is_hot)  return { label: '🔴 High',   color: '#f87171', sub: 'Act now — ready to close',   glowColor: '#f87171', badgeClass: 'badge-hot'  };
+    if (is_warm) return { label: '🟡 Medium', color: '#fbbf24', sub: 'Nurture & follow up soon',   glowColor: '#fbbf24', badgeClass: 'badge-warm' };
+    return               { label: '🔵 Low',   color: '#00e5ff', sub: 'Early stage — keep warm',    glowColor: '#00e5ff', badgeClass: 'badge-cold' };
+  }
+
+  function _objectionInfo(f3) {
+    if (f3 >= 65) return { label: '✅ Low',    color: '#4ade80', sub: 'Few blockers detected',  glowColor: '#4ade80', cls: 'low',  badgeClass: 'badge-obj-low' };
+    if (f3 >= 35) return { label: '⚠️ Medium', color: '#fbbf24', sub: 'Some objections raised', glowColor: '#fbbf24', cls: 'med',  badgeClass: 'badge-obj-med' };
+    return               { label: '🚫 High',   color: '#f87171', sub: 'Major blockers present', glowColor: '#f87171', cls: 'high', badgeClass: 'badge-obj-high'};
+  }
+
+  function _nextAction(leadScore, is_hot, is_warm, f3) {
+    if (is_hot && leadScore >= 70)  return 'Send pricing proposal immediately and schedule closing call within 24 hours.';
+    if (is_hot)                      return 'Follow up today with a tailored demo or case study to push toward decision.';
+    if (is_warm && f3 >= 50)        return 'Address key objections and re-engage within 2–3 days with a value-focused pitch.';
+    if (is_warm)                     return 'Nurture with relevant content and schedule a discovery call this week.';
+    return                            'Add to drip campaign. Check back in 1–2 weeks to re-qualify.';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SERVICE — KPI helpers (NEW)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _severityInfo(severity) {
+    const map = {
+      'Critical':  { label: '🔴 Critical',  color: '#ef4444', sub: 'Needs immediate escalation', glowColor: '#ef4444' },
+      'High':      { label: '🟠 High',      color: '#f87171', sub: 'Urgent attention required',  glowColor: '#f87171' },
+      'Medium':    { label: '🟡 Medium',     color: '#fbbf24', sub: 'Standard priority issue',    glowColor: '#fbbf24' },
+      'Low':       { label: '🟢 Low',        color: '#4ade80', sub: 'Minor issue or query',       glowColor: '#4ade80' },
+    };
+    return map[severity] || map['Medium'];
+  }
+
+  function _urgencyInfo(urgency) {
+    const map = {
+      'Immediate': { label: '🔴 Immediate', color: '#ef4444', sub: 'Resolve within hours',        glowColor: '#ef4444' },
+      'High':      { label: '🟠 High',      color: '#f87171', sub: 'Resolve within 24 hours',     glowColor: '#f87171' },
+      'Medium':    { label: '🟡 Medium',     color: '#fbbf24', sub: 'Resolve within 2-3 days',     glowColor: '#fbbf24' },
+      'Low':       { label: '🟢 Low',        color: '#4ade80', sub: 'No rush — scheduled follow-up', glowColor: '#4ade80' },
+    };
+    return map[urgency] || map['Medium'];
+  }
+
+  function _loyaltyInfo(risk) {
+    const map = {
+      'High':   { label: '🔴 High Risk',   color: '#f87171', sub: 'Customer may churn — act fast', glowColor: '#f87171' },
+      'Medium': { label: '🟡 Medium Risk',  color: '#fbbf24', sub: 'Monitor closely',              glowColor: '#fbbf24' },
+      'Low':    { label: '🟢 Low Risk',     color: '#4ade80', sub: 'Customer appears loyal',        glowColor: '#4ade80' },
+    };
+    return map[risk] || map['Medium'];
+  }
+
+  function _serviceNextAction(severity, urgency, loyalty) {
+    if (severity === 'Critical' || urgency === 'Immediate')
+      return 'Escalate immediately to senior support. Assign dedicated agent and call customer within 1 hour.';
+    if (loyalty === 'High')
+      return 'Priority follow-up within 24 hours. Offer compensation or goodwill gesture to retain customer.';
+    if (severity === 'High' || urgency === 'High')
+      return 'Schedule resolution within 24 hours. Send acknowledgment and timeline to customer.';
+    if (severity === 'Medium')
+      return 'Log ticket and schedule resolution within 2-3 business days. Send status update.';
+    return 'Acknowledge query and provide solution or information. Follow up within a week if needed.';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     MAIN ANALYZE FUNCTION
+  ════════════════════════════════════════════════════════════════ */
+
+  /* ════════════════════════════════════════════════════════════════
+     AUTO FLOW — replaces old manual analyze()
+     1. callServiceAgent() fires Bolna call, gets bolna_call_id back
+     2. _pollForResult() polls /api/service-call/<id>/result/ every 5s
+     3. When ready, routes to _renderSales / _renderService / _renderMixed
+        and pushes to history — exactly as before
+  ════════════════════════════════════════════════════════════════ */
+
+  let _pollTimer = null;
+
+  /* ═══════════════════════════════════════════════════════════
+     ANALYSIS MODAL HELPERS
+     Controls the full-screen overlay shown during/after the call.
+  ═══════════════════════════════════════════════════════════ */
+
+  const _STAGE_CFG = {
+    1: {
+      icon: '📞', title: 'Service Call Active',
+      sub:  'Agent is speaking with the customer…',
+      progress: 12,
+      status: '📞 Call active — waiting for conversation to finish…',
+    },
+    2: {
+      icon: '💾', title: 'Saving Transcript',
+      sub:  'Storing conversation to database…',
+      progress: 38,
+      status: '💾 Call ended — saving transcript to database…',
+    },
+    3: {
+      icon: '🧠', title: 'Analyzing Transcript',
+      sub:  'Feedback Agent is reading the conversation…',
+      progress: 68,
+      status: '🧠 Feedback Agent running AI analysis…',
+    },
+    4: {
+      icon: '✅', title: 'Analysis Complete',
+      sub:  'Updating dashboard with results…',
+      progress: 100,
+      status: '✅ Analysis complete — rendering dashboard…',
+    },
+  };
+
+  function openAnalysisModal(customerName, customerPhone) {
+    const modal = document.getElementById('analysisModal');
+    if (!modal) return;
+    // Reset to stage 1
+    _updateModalStage(1);
+    const subEl = document.getElementById('modal-subtitle');
+    if (subEl) subEl.textContent = customerName + (customerPhone ? ' · ' + customerPhone : '');
+    document.getElementById('modal-transcript').style.display = 'none';
+    document.getElementById('modal-transcript').textContent   = '';
+    modal.classList.add('open');
+  }
+
+  function closeAnalysisModal() {
+    const modal = document.getElementById('analysisModal');
+    if (modal) modal.classList.remove('open');
+    clearTimeout(_pollTimer);
+  }
+
+  function _updateModalStage(stage) {
+    const cfg = _STAGE_CFG[stage] || _STAGE_CFG[1];
+    const el  = (id) => document.getElementById(id);
+    if (el('modal-icon'))     el('modal-icon').textContent     = cfg.icon;
+    if (el('modal-title'))    el('modal-title').textContent    = cfg.title;
+    if (el('modal-progress')) el('modal-progress').style.width = cfg.progress + '%';
+    if (el('modal-status'))   el('modal-status').textContent   = cfg.status;
+    // Step pills
+    [1, 2, 3, 4].forEach(i => {
+      const pill = el('modal-step-' + i);
+      if (!pill) return;
+      pill.className = 'pca-step-pill' +
+        (i < stage ? ' done' : i === stage ? ' active' : '');
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     POLL LOOP — calls /api/call/<bolnaId>/analysis-status/
+     every 3 s. Tracks stages 1→4, then closes modal and
+     renders KPI cards + pushes a row into the history table.
+  ═══════════════════════════════════════════════════════════ */
+
+  function _pollForResult(bolnaCallId, customerName, attempt) {
+    if (attempt > 100) {            // ~5 min timeout
+      const el = document.getElementById('modal-status');
+      if (el) el.textContent = '⏱ Timed out — check the Calls page for results.';
+      const prog = document.getElementById('modal-progress');
+      if (prog) prog.style.background = '#f59e0b';
+      return;
+    }
+
+    fetch('/api/call/' + bolnaCallId + '/analysis-status/', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.json())
+      .then(res => {
+        const stage = res.stage || 1;
+        _updateModalStage(stage);
+
+        // Show transcript snippet once we have it (stage 2+)
+        if (stage >= 2 && res.transcript_snippet) {
+          const tEl = document.getElementById('modal-transcript');
+          if (tEl) {
+            tEl.style.display = 'block';
+            tEl.textContent   = res.transcript_snippet;
+          }
+        }
+
+        if (!res.ready) {
+          // Not ready yet — poll again
+          _pollTimer = setTimeout(
+            () => _pollForResult(bolnaCallId, customerName, attempt + 1), 3000
+          );
+          return;
+        }
+
+        /* ── Analysis is ready ── */
+        // Briefly show "complete" state, then close modal and render
+        setTimeout(() => {
+          closeAnalysisModal();
+
+          const name    = res.name || customerName;
+          const routing = res.routing_type || res.call_type || 'service_only';
+
+          if (routing === 'service_then_sales') {
+            _renderMixed(name, res);
+            _pushMixedHistory(name, res);
+          } else if (routing === 'service_only' || res.call_type === 'service') {
+            _renderService(name, res);
+            _pushServiceHistory(name, res);
+          } else {
+            _renderSales(name, res);
+            _pushSalesHistory(name, res);
+          }
+        }, 900);
+      })
+      .catch(() => {
+        // Network hiccup — silently retry
+        _pollTimer = setTimeout(
+          () => _pollForResult(bolnaCallId, customerName, attempt + 1), 4000
+        );
+      });
+  }
+
+  function _doCallServiceAgent(phone, name, btn, text, loader, msg) {
+
+
+    if (!phone) {
+      msg.style.color = '#f87171';
+      msg.textContent = '⚠ Select a customer first';
+      return;
+    }
+
+    // Reset any previous results
+    clearTimeout(_pollTimer);
+    // Hide all result panels before starting a new call
+    ['storyBox','kpiBox','detailBox','serviceKpiBox','serviceDetailBox','transferBanner']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+
+    btn.disabled         = true;
+    text.style.display   = 'none';
+    loader.style.display = 'inline-block';
+    msg.textContent      = '';
+
+    fetch('/call-service-agent/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+      body: JSON.stringify({ phone, name }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          msg.style.color = '#4ade80';
+          msg.textContent = `✅ Call initiated to ${name} (${phone})`;
+
+          // Open rich analysis modal and start polling analysis-status endpoint
+          const bolnaCallId = data.call_id;
+          if (!bolnaCallId) {
+            msg.style.color = '#fbbf24';
+            msg.textContent = '⚠ Call started but no call ID returned — analysis polling skipped.';
+            return;
+          }
+          openAnalysisModal(name, phone);
+          // Give Bolna a few seconds head-start before first poll
+          _pollTimer = setTimeout(() => _pollForResult(bolnaCallId, name, 1), 6000);
+        } else {
+          msg.style.color = '#f87171';
+          msg.textContent = '❌ ' + data.error;
+        }
+      })
+      .catch(() => {
+        msg.style.color = '#fbbf24';
+        msg.textContent = '⚠ Network error — please try again.';
+      })
+      .finally(() => {
+        btn.disabled         = false;
+        text.style.display   = 'inline';
+        loader.style.display = 'none';
+      });
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     RENDER — SALES DASHBOARD
+  ════════════════════════════════════════════════════════════════ */
+
+  function _renderSales(name, data) {
+    /* Hide service + mixed, show sales */
+    document.getElementById('serviceKpiBox').style.display    = 'none';
+    document.getElementById('serviceDetailBox').style.display = 'none';
+    document.getElementById('transferBanner').style.display   = 'none';
+    document.getElementById('kpiBox').style.display    = 'grid';
+    document.getElementById('detailBox').style.display = 'grid';
+    document.getElementById('storyBox').style.display  = 'block';
+
+    /* Story */
+    document.getElementById('storyText').textContent = (data.story && data.story.trim()) ? data.story : 'No summary returned.';
+
+    const f1  = data.f1  ?? 0;
+    const f2  = data.f2  ?? 0;
+    const f3  = data.f3  ?? 0;
+    const pos = data.pos ?? 50;
+
+    const leadScore  = _calcLeadScore(f1, f2, f3);
+    const sentInfo   = _sentimentInfo(pos);
+    const priInfo    = _priorityInfo(data.is_hot, data.is_warm);
+    const objInfo    = _objectionInfo(f3);
+    const nextAct    = _nextAction(leadScore, data.is_hot, data.is_warm, f3);
+
+    /* KPI cards */
+    const scoreEl = document.getElementById('kpi-score');
+    scoreEl.textContent = leadScore;
+    scoreEl.style.color = leadScore >= 70 ? '#4ade80' : leadScore >= 45 ? '#fbbf24' : '#f87171';
+    document.getElementById('scoreGlow').style.background = scoreEl.style.color;
+
+    const sentEl = document.getElementById('kpi-sentiment');
+    sentEl.textContent = sentInfo.label;
+    sentEl.style.color = sentInfo.color;
+    document.getElementById('kpi-sentiment-sub').textContent = sentInfo.sub;
+    document.getElementById('sentGlow').style.background     = sentInfo.glowColor;
+
+    const priEl = document.getElementById('kpi-priority');
+    priEl.textContent = priInfo.label;
+    priEl.style.color = priInfo.color;
+    document.getElementById('kpi-priority-sub').textContent  = priInfo.sub;
+    document.getElementById('priorityGlow').style.background = priInfo.glowColor;
+
+    document.getElementById('kpi-engagement').textContent  = f1 + '%';
+    document.getElementById('kpi-engagement').style.color  = f1 >= 65 ? '#4ade80' : f1 >= 40 ? '#fbbf24' : '#f87171';
+
+    document.getElementById('kpi-conversion').textContent = f3 + '%';
+    document.getElementById('kpi-conversion').style.color = f3 >= 65 ? '#4ade80' : f3 >= 35 ? '#fbbf24' : '#f87171';
+
+    const objEl = document.getElementById('kpi-objection');
+    objEl.textContent = objInfo.label;
+    objEl.style.color = objInfo.color;
+    document.getElementById('kpi-objection-sub').textContent = objInfo.sub;
+    document.getElementById('objGlow').style.background      = objInfo.glowColor;
+
+    /* Score bars */
+    requestAnimationFrame(() => {
+      _setBar('bar-f1', 'bar-f1-val', f1);
+      _setBar('bar-f2', 'bar-f2-val', f2);
+      _setBar('bar-f3', 'bar-f3-val', f3);
+      _setBar('bar-score', 'bar-score-val', leadScore, true);
+    });
+
+    /* Tags */
+    _renderTags('intents', data.intents || [], 'tag-intent');
+    _renderTags('signals', data.signals || [], 'tag-signal');
+
+    /* Next action */
+    document.getElementById('nextActionText').textContent = nextAct;
+    document.getElementById('nextActionBox').style.display = 'block';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     RENDER — SERVICE DASHBOARD (NEW)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _renderService(name, data) {
+    /* Hide sales + mixed, show service */
+    document.getElementById('kpiBox').style.display    = 'none';
+    document.getElementById('detailBox').style.display = 'none';
+    document.getElementById('transferBanner').style.display   = 'none';
+    document.getElementById('serviceKpiBox').style.display    = 'grid';
+    document.getElementById('serviceDetailBox').style.display = 'grid';
+    document.getElementById('storyBox').style.display  = 'block';
+
+    /* Story */
+    document.getElementById('storyText').textContent = (data.story && data.story.trim()) ? data.story : 'No summary returned.';
+
+    const sat     = data.satisfaction       ?? 50;
+    const sev     = data.issue_severity     || 'Medium';
+    const urg     = data.resolution_urgency || 'Medium';
+    const loyalty = data.loyalty_risk       || 'Medium';
+    const cat     = data.issue_category     || 'query';
+    const pos     = data.pos                ?? 50;
+
+    const sevInfo     = _severityInfo(sev);
+    const urgInfo     = _urgencyInfo(urg);
+    const loyaltyInfo = _loyaltyInfo(loyalty);
+    const sentInfo    = _sentimentInfo(pos);
+    const nextAct     = _serviceNextAction(sev, urg, loyalty);
+
+    /* KPI: Satisfaction */
+    const satEl = document.getElementById('kpi-satisfaction');
+    satEl.textContent = sat + '%';
+    satEl.style.color = sat >= 70 ? '#4ade80' : sat >= 40 ? '#fbbf24' : '#f87171';
+    document.getElementById('satGlow').style.background = satEl.style.color;
+
+    /* KPI: Issue Severity */
+    const sevEl = document.getElementById('kpi-severity');
+    sevEl.textContent = sevInfo.label;
+    sevEl.style.color = sevInfo.color;
+    document.getElementById('kpi-severity-sub').textContent = sevInfo.sub;
+    document.getElementById('sevGlow').style.background     = sevInfo.glowColor;
+
+    /* KPI: Resolution Urgency */
+    const urgEl = document.getElementById('kpi-urgency');
+    urgEl.textContent = urgInfo.label;
+    urgEl.style.color = urgInfo.color;
+    document.getElementById('kpi-urgency-sub').textContent = urgInfo.sub;
+    document.getElementById('urgGlow').style.background     = urgInfo.glowColor;
+
+    /* KPI: Loyalty Risk */
+    const loyEl = document.getElementById('kpi-loyalty');
+    loyEl.textContent = loyaltyInfo.label;
+    loyEl.style.color = loyaltyInfo.color;
+    document.getElementById('kpi-loyalty-sub').textContent  = loyaltyInfo.sub;
+    document.getElementById('loyaltyGlow').style.background = loyaltyInfo.glowColor;
+
+    /* KPI: Issue Category */
+    const catIcons = { maintenance:'🔧', billing:'💳', complaint:'😤', query:'❓', feedback:'💬', escalation:'📢', other:'📋' };
+    document.getElementById('kpi-category').textContent = (catIcons[cat] || '📋') + ' ' + cat;
+    document.getElementById('kpi-category-sub').textContent = 'Classified issue type';
+
+    /* KPI: Sentiment */
+    const svcSentEl = document.getElementById('kpi-svc-sentiment');
+    svcSentEl.textContent = sentInfo.label;
+    svcSentEl.style.color = sentInfo.color;
+    document.getElementById('kpi-svc-sentiment-sub').textContent = sentInfo.sub.replace('Buyer', 'Customer');
+    document.getElementById('svcSentGlow').style.background      = sentInfo.glowColor;
+
+    /* Satisfaction bar */
+    requestAnimationFrame(() => {
+      _setBar('bar-sat', 'bar-sat-val', sat);
+    });
+
+    /* Tags: Issues, Positive, Actions */
+    _renderTags('issues-raised',  data.issues_raised  || [], 'tag-issue');
+    _renderTags('positive-notes', data.positive_notes || [], 'tag-positive');
+    _renderActionItems(data.action_items || []);
+
+    /* Next action */
+    document.getElementById('nextActionText').textContent = nextAct;
+    document.getElementById('nextActionBox').style.display = 'block';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     RENDER — MIXED CASE (Service → Sales Transfer) (NEW)
+  ════════════════════════════════════════════════════════════════ */
+
+  function _renderMixed(name, data) {
+    /* Hide sales + service dashboards, show mixed transfer banner */
+    document.getElementById('kpiBox').style.display          = 'none';
+    document.getElementById('detailBox').style.display       = 'none';
+    document.getElementById('serviceKpiBox').style.display   = 'none';
+    document.getElementById('serviceDetailBox').style.display = 'none';
+    document.getElementById('transferBanner').style.display   = 'block';
+    document.getElementById('storyBox').style.display         = 'block';
+
+    /* Story */
+    document.getElementById('storyText').textContent = (data.story && data.story.trim()) ? data.story : 'Mixed case — customer has issue and sales interest.';
+
+    /* Transfer steps */
+    const severity = data.issue_severity || 'Medium';
+    const category = data.issue_category || 'query';
+    document.getElementById('transferStep1').textContent =
+      `Resolve ${category} issue (${severity} severity) → Create ticket → Attempt resolution`;
+    document.getElementById('transferStep2').textContent =
+      `"I'll connect you to our product specialist" → Transfer to sales agent`;
+
+    /* Service KPIs in compact view */
+    const sat = data.satisfaction ?? 50;
+    const satEl = document.getElementById('mix-satisfaction');
+    satEl.textContent = sat + '%';
+    satEl.style.color = sat >= 70 ? '#4ade80' : sat >= 40 ? '#fbbf24' : '#f87171';
+
+    document.getElementById('mix-severity').textContent = severity;
+    document.getElementById('mix-severity').style.color = severity === 'Critical' ? '#ef4444' : severity === 'High' ? '#f87171' : severity === 'Medium' ? '#fbbf24' : '#4ade80';
+
+    const urgency = data.resolution_urgency || 'Medium';
+    document.getElementById('mix-urgency').textContent = urgency;
+    document.getElementById('mix-urgency').style.color = urgency === 'Immediate' ? '#ef4444' : urgency === 'High' ? '#f87171' : urgency === 'Medium' ? '#fbbf24' : '#4ade80';
+
+    const loyalty = data.loyalty_risk || 'Medium';
+    document.getElementById('mix-loyalty').textContent = loyalty;
+    document.getElementById('mix-loyalty').style.color = loyalty === 'High' ? '#f87171' : loyalty === 'Medium' ? '#fbbf24' : '#4ade80';
+
+    /* Sales KPIs in compact view */
+    const f1 = data.f1 ?? 0, f2 = data.f2 ?? 0, f3 = data.f3 ?? 0;
+    const leadScore = _calcLeadScore(f1, f2, f3);
+
+    const lsEl = document.getElementById('mix-leadscore');
+    lsEl.textContent = leadScore;
+    lsEl.style.color = leadScore >= 70 ? '#4ade80' : leadScore >= 45 ? '#fbbf24' : '#f87171';
+
+    const engEl = document.getElementById('mix-engagement');
+    engEl.textContent = f1 + '%';
+    engEl.style.color = f1 >= 65 ? '#4ade80' : f1 >= 40 ? '#fbbf24' : '#f87171';
+
+    const convEl = document.getElementById('mix-conversion');
+    convEl.textContent = f3 + '%';
+    convEl.style.color = f3 >= 65 ? '#4ade80' : f3 >= 35 ? '#fbbf24' : '#f87171';
+
+    /* Next action */
+    const nextAct = `1) Resolve ${category} issue immediately. 2) Once resolved, transfer to sales: "I'll connect you to our product specialist for the new offering you mentioned."`;
+    document.getElementById('nextActionText').textContent = nextAct;
+    document.getElementById('nextActionBox').style.display = 'block';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SHARED HELPERS
+  ════════════════════════════════════════════════════════════════ */
+
+  function _setBar(fillId, valId, pct, isScore) {
+    document.getElementById(fillId).style.width = pct + '%';
+    document.getElementById(valId).textContent  = isScore ? pct + ' / 100' : pct + '%';
+  }
+
+  function _renderTags(containerId, items, cls) {
+    const el = document.getElementById(containerId);
+    if (!items.length) {
+      el.innerHTML = '<span class="tag tag-keyword" style="color:rgba(255,255,255,0.2);">None detected</span>';
+      return;
+    }
+    el.innerHTML = items.map(i => `<span class="tag ${cls}">${_e(i)}</span>`).join('');
+  }
+
+  function _renderActionItems(items) {
+    const el = document.getElementById('action-items');
+    if (!items.length) {
+      el.innerHTML = '<span class="tag tag-keyword" style="color:rgba(255,255,255,0.2);">None</span>';
+      return;
+    }
+    el.innerHTML = items.map((item, i) =>
+      `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.12);border-radius:10px;">
+        <span style="color:#a78bfa;font-weight:800;font-size:13px;">${i+1}</span>
+        <span style="color:#c5d8ec;font-size:12px;line-height:1.5;">${_e(item)}</span>
+      </div>`
+    ).join('');
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     PUSH TO HISTORY TABLES
+  ════════════════════════════════════════════════════════════════ */
+
+  function _pushSalesHistory(name, data) {
+    const f1 = data.f1 ?? 0, f2 = data.f2 ?? 0, f3 = data.f3 ?? 0;
+    const pos = data.pos ?? 50;
+    const leadScore = _calcLeadScore(f1, f2, f3);
+    const sentInfo  = _sentimentInfo(pos);
+    const priInfo   = _priorityInfo(data.is_hot, data.is_warm);
+    const objInfo   = _objectionInfo(f3);
+    const temp = data.is_hot ? 'Hot' : data.is_warm ? 'Warm' : 'Cold';
+    const cost = _estCallCost(temp);
+
+    const callRow = `<tr>
+      <td style="font-weight:600;color:#e8f0f8;">${_e(name)}</td>
+      <td><span class="${priInfo.badgeClass}">${priInfo.label}</span></td>
+      <td><span class="${sentInfo.badgeClass}">${sentInfo.label}</span></td>
+      <td><span class="${objInfo.badgeClass}">${objInfo.label}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;color:${cost.color};font-size:11px;">${cost.text}</td>
+    </tr>`;
+    _callHistory.unshift(callRow);
+    document.getElementById('calls').innerHTML = _callHistory.slice(0, 10).join('');
+
+    if (leadScore >= 60) {
+      const scoreColor = leadScore >= 70 ? '#4ade80' : leadScore >= 45 ? '#fbbf24' : '#f87171';
+      const engPct   = Math.min(100, Math.round(leadScore * 1.1));
+      const engColor = engPct >= 65 ? '#4ade80' : engPct >= 40 ? '#fbbf24' : '#f87171';
+      const convPct   = Math.max(0, Math.round(leadScore * 0.85));
+      const convColor = convPct >= 65 ? '#4ade80' : convPct >= 35 ? '#fbbf24' : '#f87171';
+      const nextMap = { 'Hot': '🚀 Send proposal now', 'Warm': '📅 Schedule follow-up', 'Cold': '📧 Drip campaign' };
+      const leadRow = `<tr>
+        <td style="font-weight:600;color:#e8f0f8;">${_e(name)}</td>
+        <td style="font-family:'JetBrains Mono',monospace;color:${scoreColor};">${leadScore} <span style="font-size:10px;color:var(--muted)">/ 100</span></td>
+        <td style="font-family:'JetBrains Mono',monospace;color:${engColor};">${engPct}%</td>
+        <td style="font-family:'JetBrains Mono',monospace;color:${convColor};">${convPct}%</td>
+        <td style="font-size:11px;color:#a0b3c6;">${nextMap[temp] || '📧 Drip campaign'}</td>
+      </tr>`;
+      _leadHistory.unshift(leadRow);
+      document.getElementById('leads').innerHTML = _leadHistory.slice(0, 10).join('');
+    }
+  }
+
+  function _pushServiceHistory(name, data) {
+    const h = {
+      name:               name,
+      satisfaction:       data.satisfaction       ?? 50,
+      issue_severity:     data.issue_severity     || 'Medium',
+      resolution_urgency: data.resolution_urgency || 'Medium',
+      loyalty_risk:       data.loyalty_risk       || 'Medium',
+      issue_category:     data.issue_category     || 'query',
+      sentiment:          (data.pos ?? 50) >= 60 ? 'positive' : (data.pos ?? 50) >= 35 ? 'neutral' : 'negative',
+    };
+    const row = _buildServiceRow(h);
+    _serviceHistory.unshift(row);
+    document.getElementById('service-calls').innerHTML = _serviceHistory.slice(0, 10).join('');
+  }
+
+  function _pushMixedHistory(name, data) {
+    const f1 = data.f1 ?? 0, f2 = data.f2 ?? 0, f3 = data.f3 ?? 0;
+    const h = {
+      name:           name,
+      satisfaction:   data.satisfaction   ?? 50,
+      issue_severity: data.issue_severity || 'Medium',
+      lead_score:     _calcLeadScore(f1, f2, f3),
+      sentiment:      (data.pos ?? 50) >= 60 ? 'positive' : (data.pos ?? 50) >= 35 ? 'neutral' : 'negative',
+      routing_type:   'service_then_sales',
+    };
+    const row = _buildMixedRow(h);
+    _mixedHistory.unshift(row);
+    document.getElementById('mixed-calls').innerHTML = _mixedHistory.slice(0, 10).join('');
+  }
+
+  /* ── Service Agent ── */
+  let _selectedPhone = '';
+  let _selectedName  = '';
+
+  function onCustomerSelect(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) {
+      _selectedPhone = '';
+      _selectedName  = '';
+      document.getElementById('selected-info').classList.remove('visible');
+      document.getElementById('service-btn').disabled = true;
+      document.querySelectorAll('.customer-mini-table tr.selected')
+               .forEach(r => r.classList.remove('selected'));
+      return;
+    }
+    _applySelection(opt.value, opt.dataset.name, opt.dataset.phone, opt.dataset.tag);
+  }
+
+  function selectCustomerFromTable(id, name, phone, tag) {
+    const sel = document.getElementById('customer-select');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === id) { sel.selectedIndex = i; break; }
+    }
+    _applySelection(id, name, phone, tag);
+  }
+
+  function quickCall(phone, name) {
+    _selectedPhone = phone;
+    _selectedName  = name;
+    const btn    = document.getElementById('service-btn');
+    const text   = document.getElementById('btn-text');
+    const loader = document.getElementById('btn-loader');
+    const msg    = document.getElementById('service-msg');
+    _doCallServiceAgent(phone, name, btn, text, loader, msg);
+  }
+
+  function _applySelection(id, name, phone, tag) {
+    _selectedPhone = phone;
+    _selectedName  = name;
+    document.getElementById('sci-name').textContent  = name;
+    document.getElementById('sci-phone').textContent = phone;
+    const tagEl = document.getElementById('sci-tag');
+    const tagLabels = { paid: '⭐ Paid', free: '🆓 Free', untagged: '🏷 Untagged', allowed: '☎️ Allowed' };
+    tagEl.textContent  = tagLabels[tag] || '🏷 Untagged';
+    tagEl.className    = 'sci-tag tag-' + (tag || 'untagged');
+    document.getElementById('selected-info').classList.add('visible');
+    document.getElementById('service-btn').disabled = false;
+    document.querySelectorAll('.customer-mini-table tr.selected')
+             .forEach(r => r.classList.remove('selected'));
+    const row = document.getElementById('row-' + id);
+    if (row) row.classList.add('selected');
+    document.getElementById('service-msg').textContent = '';
+  }
+
+  function callServiceAgent() {
+    const phone = _selectedPhone;
+    const name  = _selectedName;
+    const btn    = document.getElementById('service-btn');
+    const text   = document.getElementById('btn-text');
+    const loader = document.getElementById('btn-loader');
+    const msg    = document.getElementById('service-msg');
+
+    if (!phone) {
+      msg.style.color = '#f87171';
+      msg.textContent = '⚠ Select a customer first';
+      return;
+    }
+
+    // Delegate to the auto-polling implementation defined above
+    _doCallServiceAgent(phone, name, btn, text, loader, msg);
+  }
+
+// ★ Number whitelist guard — show warning if number not in allowed list
+async function checkNumberAllowed(phone) {
+  try {
+    const res = await fetch('/numbers/');
+    const data = await res.json();
+    const nums = (data.numbers || []).map(n => n.phone.replace(/\s/g,''));
+    const clean = phone.replace(/\s/g,'');
+    const normalised = clean.startsWith('+') ? clean : '+91' + clean.replace(/^0+/,'');
+    return nums.includes(normalised) || nums.includes(clean);
+  } catch(e) { return true; } // fail open, server will enforce
+}
+
+</script>
+{% endblock %}

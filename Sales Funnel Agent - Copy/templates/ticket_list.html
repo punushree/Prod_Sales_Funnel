@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Tickets — AOS Agent{% endblock %}
+{% block page_title %}Support Tickets{% endblock %}
+{% block nav_tickets %}active{% endblock %}
+{% block nav_tickets2 %}active{% endblock %}
+
+{% block content %}
+<div class="card p-4">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr><th>Customer</th><th>Issue Type</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for ticket in tickets %}
+      <tr>
+        <td class="fw-semibold">{{ ticket.customer.name }}</td>
+        <td><span class="badge bg-secondary">{{ ticket.issue_type }}</span></td>
+        <td>
+          <span class="badge
+            {% if ticket.status == 'open' %}bg-danger
+            {% elif ticket.status == 'in_progress' %}bg-warning text-dark
+            {% elif ticket.status == 'resolved' %}bg-success
+            {% else %}bg-secondary{% endif %}">
+            {{ ticket.get_status_display }}
+          </span>
+        </td>
+        <td>{{ ticket.assigned_to|default:"—" }}</td>
+        <td class="text-muted small">{{ ticket.created_at|date:"d M Y, H:i" }}</td>
+        <td>
+          <form method="post" action="{% url 'ticket_update' ticket.id %}" class="d-flex gap-1">
+            {% csrf_token %}
+            <select name="status" class="form-select form-select-sm" style="width:130px;">
+              <option value="open" {% if ticket.status == 'open' %}selected{% endif %}>Open</option>
+              <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+              <option value="resolved" {% if ticket.status == 'resolved' %}selected{% endif %}>Resolved</option>
+              <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>Closed</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-center text-muted py-4">No tickets found</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

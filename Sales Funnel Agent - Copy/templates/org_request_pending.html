@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Awaiting Approval — AOS Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  :root{--cyan:#00E5FF;--bg:#06090F;--card:#111820;--border:rgba(255,255,255,0.07);--text:#E8ECF1;--muted:#5A6B80;--font:'Outfit',sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:var(--font);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:52px 48px;max-width:560px;width:100%;text-align:center;animation:fadeIn .5s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:40px;}
+  .brand-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--cyan),#0077FF);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#000;}
+  .brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.02em;}
+  .clock-anim{width:80px;height:80px;border-radius:50%;border:3px solid rgba(251,191,36,.3);background:rgba(251,191,36,.06);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 24px;animation:pulse 2.5s ease infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.25)}50%{box-shadow:0 0 0 12px rgba(251,191,36,.0)}}
+  h1{font-size:24px;font-weight:800;color:#fff;margin-bottom:10px;}
+  .sub{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:32px;max-width:400px;margin-left:auto;margin-right:auto;}
+  .org-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:30px;padding:8px 18px;font-size:14px;font-weight:600;color:#fff;margin-bottom:32px;}
+  .org-badge .dot{width:8px;height:8px;border-radius:50%;background:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.5);animation:blink 1.5s ease infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .steps{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:16px;padding:22px 26px;margin-bottom:32px;text-align:left;}
+  .step-item{display:flex;align-items:flex-start;gap:14px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+  .step-item:last-child{border-bottom:none;padding-bottom:0;}
+  .step-item:first-child{padding-top:0;}
+  .step-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;}
+  .step-icon.done{background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);}
+  .step-icon.pending{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);}
+  .step-icon.waiting{background:rgba(255,255,255,.04);border:1px solid var(--border);}
+  .step-text .step-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:2px;}
+  .step-text .step-hint{font-size:12px;color:var(--muted);}
+  .info-box{background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.12);border-radius:12px;padding:16px 18px;margin-bottom:28px;font-size:13px;color:var(--muted);line-height:1.6;text-align:left;}
+  .info-box strong{color:var(--cyan);}
+  .logout-link{display:block;font-size:13px;color:var(--muted);text-decoration:none;margin-top:12px;transition:color .15s;}
+  .logout-link:hover{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="brand-icon">A</div>
+    <div class="brand-name">AOS Agent</div>
+  </div>
+
+  <div class="clock-anim">⏳</div>
+  <h1>Awaiting Approval</h1>
+  <p class="sub">Your organisation access request is under review. Our superadmin will approve it shortly and you'll have full access.</p>
+
+  {% if org %}
+  <div class="org-badge">
+    <span class="dot"></span>
+    {{ org.name }}
+  </div>
+  {% endif %}
+
+  <div class="steps">
+    <div class="step-item">
+      <div class="step-icon done">✓</div>
+      <div class="step-text">
+        <div class="step-title">Request Submitted</div>
+        <div class="step-hint">Your organisation details were received successfully.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-icon pending">🔍</div>
+      <div class="step-text">
+        <div class="step-title">Under Review</div>
+        <div class="step-hint">Superadmin is reviewing your request — usually within 24 hours.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-icon waiting">🚀</div>
+      <div class="step-text">
+        <div class="step-title">Access Granted</div>
+        <div class="step-hint">Once approved, your dashboard and all features will be unlocked.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>What happens next?</strong><br>
+    Once your request is approved, simply <strong>log in again</strong> with the same email and password you received. Your full organisation dashboard — calls, leads, teams, analytics — will be ready immediately.
+  </div>
+
+  <a href="/logout/" class="logout-link">← Sign out and come back later</a>
+</div>
+</body>
+</html>
