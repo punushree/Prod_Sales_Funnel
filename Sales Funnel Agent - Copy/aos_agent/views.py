@@ -877,6 +877,23 @@ def allowed_numbers_add(request):
         entry.label     = label or entry.label
         entry.save(update_fields=["is_active", "label"])
 
+    # ── Auto-create / update Customer with default "free" tag ────────
+    customer_name = label.strip() if label else phone
+    customer, cust_created = Customer.objects.get_or_create(
+        org=org, phone=phone,
+        defaults={"name": customer_name, "extra_data": {"tag": "free"}}
+    )
+    if not cust_created:
+        # Only set tag to "free" if no tag is already assigned
+        if not (customer.extra_data or {}).get("tag"):
+            customer.extra_data = customer.extra_data or {}
+            customer.extra_data["tag"] = "free"
+            customer.save(update_fields=["extra_data"])
+        # Keep the name in sync if label was provided
+        if label and customer.name != customer_name:
+            customer.name = customer_name
+            customer.save(update_fields=["name"])
+
     return JsonResponse({
         "success": True,
         "id":      str(entry.id),
@@ -914,11 +931,14 @@ def org_request_form(request):
     """Public form: client fills details → super admin reviews."""
     if request.method == "POST":
         p = request.POST
+        contact_email = p.get("contact_email", "").strip()
+        # admin_email is the login email — prefer the dedicated field; fall back to contact_email
+        admin_email   = p.get("admin_email", "").strip() or contact_email
         OrgRequest.objects.create(
             contact_name  = p.get("contact_name", "").strip(),
-            contact_email = p.get("contact_email", "").strip(),
+            contact_email = contact_email,
             contact_phone = p.get("contact_phone", "").strip(),
-            admin_email   = p.get("contact_email", "").strip(),
+            admin_email   = admin_email,
             org_name      = p.get("org_name", "").strip(),
             industry      = p.get("industry", "generic"),
             plan_type     = p.get("plan_type", "trial"),
@@ -985,14 +1005,23 @@ def org_request_review(request, request_id):
         # admin_email field is optional on the form — contact_email is always filled
         # so use contact_email as the login email when admin_email is blank
         admin_email = (org_req.admin_email or org_req.contact_email or "").strip()
-        if admin_email and not User.objects.filter(email=admin_email).exists():
-            User.objects.create_user(
-                email    = admin_email,
-                password = AUTO_PASSWORD,
-                name     = org_req.contact_name,
-                role     = "org_admin",
-                org      = org,
-            )
+        if admin_email:
+            existing = User.objects.filter(email=admin_email).first()
+            if existing:
+                # User already exists — update org assignment and reset password
+                existing.org  = org
+                existing.role = "org_admin"
+                existing.set_password(AUTO_PASSWORD)
+                existing.is_active = True
+                existing.save(update_fields=["org", "role", "password", "is_active"])
+            else:
+                User.objects.create_user(
+                    email    = admin_email,
+                    password = AUTO_PASSWORD,
+                    name     = org_req.contact_name,
+                    role     = "org_admin",
+                    org      = org,
+                )
 
         # Save password on OrgRequest for reference
         org_req.generated_password = AUTO_PASSWORD
@@ -1674,8 +1703,10 @@ def org_approve(request, org_id):
                 admin_user = existing_user
 
         else:
-            # User already exists — ensure password is Test@123 (re-set for consistency)
+            # User already exists — reset password to Test@123 so login works
             admin_user = existing_admin
+            admin_user.set_password(AUTO_PASSWORD)
+            admin_user.save(update_fields=["password"])
 
         response_data = {
             "success":  True,
@@ -1777,7 +1808,9 @@ def org_create_view(request):
         return redirect("dashboard")
     if request.method == "POST":
         p = request.POST
-        Organisation.objects.create(
+        AUTO_PASSWORD = "Test@123"
+
+        org = Organisation.objects.create(
             name                 = p.get("name", "").strip(),
             industry             = p.get("industry", "generic"),
             plan_type            = p.get("plan_type", "trial"),
@@ -1788,11 +1821,38 @@ def org_create_view(request):
             service_agent_prompt = p.get("service_agent_prompt", ""),
             bolna_agent_id       = p.get("bolna_agent_id", ""),
             phone_number         = p.get("phone_number", ""),
-            is_approved          = False,   # starts pending; super_admin approves separately
+            is_approved          = True,
             is_active            = True,
+            approved_by          = request.user.name,
+            approved_at          = timezone.now(),
         )
+
+        # Create an org admin user so the org can log in immediately
+        admin_email = p.get("admin_email", "").strip()
+        if not admin_email:
+            safe_name   = org.name.lower().replace(" ", "_")[:30]
+            admin_email = f"admin_{safe_name}@example.com"
+
+        if not User.objects.filter(email=admin_email).exists():
+            User.objects.create_user(
+                email    = admin_email,
+                password = AUTO_PASSWORD,
+                name     = p.get("admin_name", org.name + " Admin").strip(),
+                role     = "org_admin",
+                org      = org,
+            )
+        else:
+            existing = User.objects.get(email=admin_email)
+            if existing.org is None:
+                existing.org  = org
+                existing.role = "org_admin"
+                existing.save(update_fields=["org", "role"])
+            # Always reset to known password so login works
+            existing.set_password(AUTO_PASSWORD)
+            existing.save(update_fields=["password"])
+
         from django.contrib import messages as _msg
-        _msg.success(request, "Organisation created — pending approval.")
+        _msg.success(request, f"Organisation created and approved. Admin login: {admin_email} / {AUTO_PASSWORD}")
     return redirect("org_list")
 
 

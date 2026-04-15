@@ -39,7 +39,7 @@ from .serializers import (
     CallLogSerializer, TicketSerializer,
 )
 from .permissions import IsSuperAdmin, IsSameOrg
-from .tasks import run_post_call_analysis, auto_hangup_call
+from .tasks import run_post_call_analysis, auto_hangup_call, warn_call_limit
 from .bolna_service import initiate_call
 
 logger = logging.getLogger(__name__)
@@ -159,6 +159,23 @@ def call_list_view(request):
         if user.role == "super_admin"
         else CallLog.objects.filter(org=user.org)
     )
+
+    # ── AUTO-RESOLVE STALE CALLS ──────────────────────────────────────────
+    # Any call still "in_progress" after 20 minutes is stuck (webhook missed).
+    # Silently mark it completed so it never shows as "Conversation in progress…"
+    _stale_cutoff = timezone.now() - timedelta(minutes=20)
+    stale_calls = list(qs.filter(status="in_progress", started_at__lt=_stale_cutoff))
+    for _c in stale_calls:
+        _dur = int((timezone.now() - _c.started_at).total_seconds()) if _c.started_at else 0
+        _c.status   = "completed"
+        _c.ended_at = _c.ended_at or timezone.now()
+        if _dur > 0 and _c.duration_seconds == 0:
+            _c.duration_seconds = _dur
+        _c.save(update_fields=["status", "ended_at", "duration_seconds"])
+    if stale_calls:
+        logger.info("call_list_view: auto-resolved %d stale in_progress call(s)", len(stale_calls))
+    # ─────────────────────────────────────────────────────────────────────
+
     qs = qs.select_related("lead", "customer", "analysis").order_by("-started_at")
     call_type = request.GET.get("call_type")
     direction = request.GET.get("direction")
@@ -338,10 +355,23 @@ def bolna_initiate(request):
         status        = "in_progress",
     )
 
-    # ── FIX: Schedule auto hang-up if org has a call time limit ───────
+    # ── Two-phase graceful shutdown: warn then hang up ─────────────────
     call_limit = getattr(org, "call_limit_seconds", 120)
     if call_limit and call_limit > 0 and bolna_call_id:
         try:
+            # Phase 1 — warn the caller 30 s before the limit (skip if limit ≤ 30 s)
+            warn_seconds = 30
+            if call_limit > warn_seconds:
+                warn_call_limit.apply_async(
+                    args=[bolna_call_id, str(call.id), warn_seconds],
+                    countdown=call_limit - warn_seconds,
+                )
+                logger.info(
+                    "Warn-before-hangup scheduled for call %s in %ds (bolna_id=%s)",
+                    call.id, call_limit - warn_seconds, bolna_call_id,
+                )
+
+            # Phase 2 — hard stop at limit
             auto_hangup_call.apply_async(
                 args=[bolna_call_id, str(call.id), call_limit],
                 countdown=call_limit,
@@ -711,14 +741,25 @@ def customer_list_view(request):
         for c in customers_qs
     ]
 
-    # Allowed numbers for the org
+    # Allowed numbers for the org — used both for the management table AND
+    # as fallback entries in the Service Agent calling dropdown
     allowed_numbers = []
+    allowed_numbers_for_dropdown = []   # ← always defined, even when org is None
     if org:
+        allowed_qs = AllowedPhoneNumber.objects.filter(org=org, is_active=True).order_by("-added_at")
         allowed_numbers = list(
-            AllowedPhoneNumber.objects.filter(org=org, is_active=True)
-            .values("id", "phone", "label", "added_at")
-            .order_by("-added_at")
+            allowed_qs.values("id", "phone", "label", "added_at")
         )
+        # Build dropdown-compatible entries from allowed numbers
+        # These only appear in the dropdown when the Customer DB has no records
+        for an in allowed_qs:
+            label = an.label.strip() if an.label else ""
+            allowed_numbers_for_dropdown.append({
+                "id":    f"allowed_{an.id}",
+                "name":  label if label else an.phone,
+                "phone": an.phone,
+                "tag":   "allowed",
+            })
 
     return render(request, "customer.html", {
         "call_history":      sales_history,
@@ -727,8 +768,9 @@ def customer_list_view(request):
         "mixed_history":     mixed_history,
         "service_customers": service_customers,
         "allowed_numbers":   allowed_numbers,
+        "allowed_numbers_for_dropdown": allowed_numbers_for_dropdown,
         "number_quota":      org.number_quota if org else 0,
-        "manual_input_removed": True,  # tells template not to show manual form
+        "manual_input_removed": True,
     })
 
 
@@ -835,6 +877,23 @@ def allowed_numbers_add(request):
         entry.label     = label or entry.label
         entry.save(update_fields=["is_active", "label"])
 
+    # ── Auto-create / update Customer with default "free" tag ────────
+    customer_name = label.strip() if label else phone
+    customer, cust_created = Customer.objects.get_or_create(
+        org=org, phone=phone,
+        defaults={"name": customer_name, "extra_data": {"tag": "free"}}
+    )
+    if not cust_created:
+        # Only set tag to "free" if no tag is already assigned
+        if not (customer.extra_data or {}).get("tag"):
+            customer.extra_data = customer.extra_data or {}
+            customer.extra_data["tag"] = "free"
+            customer.save(update_fields=["extra_data"])
+        # Keep the name in sync if label was provided
+        if label and customer.name != customer_name:
+            customer.name = customer_name
+            customer.save(update_fields=["name"])
+
     return JsonResponse({
         "success": True,
         "id":      str(entry.id),
@@ -872,11 +931,14 @@ def org_request_form(request):
     """Public form: client fills details → super admin reviews."""
     if request.method == "POST":
         p = request.POST
+        contact_email = p.get("contact_email", "").strip()
+        # admin_email is the login email — prefer the dedicated field; fall back to contact_email
+        admin_email   = p.get("admin_email", "").strip() or contact_email
         OrgRequest.objects.create(
             contact_name  = p.get("contact_name", "").strip(),
-            contact_email = p.get("contact_email", "").strip(),
+            contact_email = contact_email,
             contact_phone = p.get("contact_phone", "").strip(),
-            admin_email   = p.get("contact_email", "").strip(),
+            admin_email   = admin_email,
             org_name      = p.get("org_name", "").strip(),
             industry      = p.get("industry", "generic"),
             plan_type     = p.get("plan_type", "trial"),
@@ -913,8 +975,14 @@ def org_request_review(request, request_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 
-    data   = json.loads(request.body) if request.body else {}
-    action = data.get("action", "approve")
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except (json.JSONDecodeError, ValueError):
+        data = {}
+
+    action = data.get("action", "").strip()
+    if not action:
+        return JsonResponse({"error": "action is required (approve or reject)"}, status=400)
 
     if action == "approve":
         AUTO_PASSWORD = "Test@123"
@@ -937,14 +1005,23 @@ def org_request_review(request, request_id):
         # admin_email field is optional on the form — contact_email is always filled
         # so use contact_email as the login email when admin_email is blank
         admin_email = (org_req.admin_email or org_req.contact_email or "").strip()
-        if admin_email and not User.objects.filter(email=admin_email).exists():
-            User.objects.create_user(
-                email    = admin_email,
-                password = AUTO_PASSWORD,
-                name     = org_req.contact_name,
-                role     = "org_admin",
-                org      = org,
-            )
+        if admin_email:
+            existing = User.objects.filter(email=admin_email).first()
+            if existing:
+                # User already exists — update org assignment and reset password
+                existing.org  = org
+                existing.role = "org_admin"
+                existing.set_password(AUTO_PASSWORD)
+                existing.is_active = True
+                existing.save(update_fields=["org", "role", "password", "is_active"])
+            else:
+                User.objects.create_user(
+                    email    = admin_email,
+                    password = AUTO_PASSWORD,
+                    name     = org_req.contact_name,
+                    role     = "org_admin",
+                    org      = org,
+                )
 
         # Save password on OrgRequest for reference
         org_req.generated_password = AUTO_PASSWORD
@@ -1524,10 +1601,20 @@ def call_service_agent(request):
                 started_at=timezone.now(), status="in_progress",
             )
 
-        # ── FIX: Schedule auto hang-up for service calls ──────────────
+        # ── Two-phase graceful shutdown for service calls ─────────────
         call_limit = getattr(org, "call_limit_seconds", 120)
         if svc_call and call_limit and call_limit > 0 and bolna_call_id:
             try:
+                warn_seconds = 30
+                if call_limit > warn_seconds:
+                    warn_call_limit.apply_async(
+                        args=[bolna_call_id, str(svc_call.id), warn_seconds],
+                        countdown=call_limit - warn_seconds,
+                    )
+                    logger.info(
+                        "[SERVICE CALL] Warn-before-hangup scheduled for call %s in %ds",
+                        svc_call.id, call_limit - warn_seconds,
+                    )
                 auto_hangup_call.apply_async(
                     args=[bolna_call_id, str(svc_call.id), call_limit],
                     countdown=call_limit,
@@ -1563,8 +1650,14 @@ def org_approve(request, org_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 
-    data   = json.loads(request.body) if request.body else {}
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except (json.JSONDecodeError, ValueError):
+        data = {}
+
     action = data.get("action", "approve")
+
+    AUTO_PASSWORD = "Test@123"
 
     if action == "approve":
         org.is_approved = True
@@ -1572,11 +1665,73 @@ def org_approve(request, org_id):
         org.approved_by = request.user.name
         org.approved_at = timezone.now()
         org.save(update_fields=["is_approved", "is_active", "approved_by", "approved_at"])
-        return JsonResponse({"success": True, "message": f"'{org.name}' approved"})
+
+        # ── FIX: Create an org-admin user if none exists for this org ──
+        admin_user = None
+        existing_admin = User.objects.filter(org=org, role="org_admin").first()
+        if not existing_admin:
+            # Try to find an email from the linked OrgRequest, else derive one
+            admin_email = ""
+            try:
+                linked_req = org.request  # OneToOne reverse
+                admin_email = (linked_req.admin_email or linked_req.contact_email or "").strip()
+            except Exception:
+                pass
+
+            if not admin_email:
+                # Derive a safe email from org name as fallback
+                safe_name = org.name.lower().replace(" ", "_")[:30]
+                admin_email = f"admin_{safe_name}@{safe_name}.internal"
+
+            # Only create if email slot is free
+            if not User.objects.filter(email=admin_email).exists():
+                admin_user = User.objects.create_user(
+                    email    = admin_email,
+                    password = AUTO_PASSWORD,
+                    name     = f"{org.name} Admin",
+                    role     = "org_admin",
+                    org      = org,
+                )
+                logger.info("org_approve: created admin user %s for org %s", admin_email, org.name)
+            else:
+                # Email already exists — assign that user to this org if unassigned
+                existing_user = User.objects.get(email=admin_email)
+                if existing_user.org is None:
+                    existing_user.org  = org
+                    existing_user.role = "org_admin"
+                    existing_user.save(update_fields=["org", "role"])
+                admin_user = existing_user
+
+        else:
+            # User already exists — reset password to Test@123 so login works
+            admin_user = existing_admin
+            admin_user.set_password(AUTO_PASSWORD)
+            admin_user.save(update_fields=["password"])
+
+        response_data = {
+            "success":  True,
+            "message":  f"'{org.name}' approved",
+            "admin_email":        admin_user.email if admin_user else None,
+            "generated_password": AUTO_PASSWORD,
+        }
+        return JsonResponse(response_data)
+
     elif action == "reject":
         org.is_approved = False
         org.is_active   = False
         org.save(update_fields=["is_approved", "is_active"])
+
+        # Also mark linked OrgRequest as rejected if one exists
+        try:
+            linked_req = org.request
+            if linked_req.status == "pending":
+                linked_req.status      = "rejected"
+                linked_req.reviewed_by = request.user.name
+                linked_req.reviewed_at = timezone.now()
+                linked_req.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        except Exception:
+            pass
+
         return JsonResponse({"success": True, "message": f"'{org.name}' rejected"})
     else:
         return JsonResponse({"error": "Invalid action"}, status=400)
@@ -1603,6 +1758,13 @@ def org_set_limits(request, org_id):
     if data.get("plan_type"):
         org.plan_type = data["plan_type"]
         update_fields.append("plan_type")
+    # ── call time limit (0 = no limit) ───────────────────────────────
+    if "call_limit_seconds" in data:
+        try:
+            org.call_limit_seconds = max(0, int(data["call_limit_seconds"]))
+            update_fields.append("call_limit_seconds")
+        except (ValueError, TypeError):
+            pass
     if update_fields:
         org.save(update_fields=update_fields)
 
@@ -1613,6 +1775,7 @@ def org_set_limits(request, org_id):
             "max_users": org.max_users, "max_agents": org.max_agents, "max_teams": org.max_teams,
             "call_quota": org.call_quota, "minutes_quota": org.minutes_quota,
             "number_quota": org.number_quota, "plan_type": org.plan_type,
+            "call_limit_seconds": org.call_limit_seconds,
         },
     })
 
@@ -1645,7 +1808,9 @@ def org_create_view(request):
         return redirect("dashboard")
     if request.method == "POST":
         p = request.POST
-        Organisation.objects.create(
+        AUTO_PASSWORD = "Test@123"
+
+        org = Organisation.objects.create(
             name                 = p.get("name", "").strip(),
             industry             = p.get("industry", "generic"),
             plan_type            = p.get("plan_type", "trial"),
@@ -1656,11 +1821,38 @@ def org_create_view(request):
             service_agent_prompt = p.get("service_agent_prompt", ""),
             bolna_agent_id       = p.get("bolna_agent_id", ""),
             phone_number         = p.get("phone_number", ""),
-            is_approved          = False,   # starts pending; super_admin approves separately
+            is_approved          = True,
             is_active            = True,
+            approved_by          = request.user.name,
+            approved_at          = timezone.now(),
         )
+
+        # Create an org admin user so the org can log in immediately
+        admin_email = p.get("admin_email", "").strip()
+        if not admin_email:
+            safe_name   = org.name.lower().replace(" ", "_")[:30]
+            admin_email = f"admin_{safe_name}@example.com"
+
+        if not User.objects.filter(email=admin_email).exists():
+            User.objects.create_user(
+                email    = admin_email,
+                password = AUTO_PASSWORD,
+                name     = p.get("admin_name", org.name + " Admin").strip(),
+                role     = "org_admin",
+                org      = org,
+            )
+        else:
+            existing = User.objects.get(email=admin_email)
+            if existing.org is None:
+                existing.org  = org
+                existing.role = "org_admin"
+                existing.save(update_fields=["org", "role"])
+            # Always reset to known password so login works
+            existing.set_password(AUTO_PASSWORD)
+            existing.save(update_fields=["password"])
+
         from django.contrib import messages as _msg
-        _msg.success(request, "Organisation created — pending approval.")
+        _msg.success(request, f"Organisation created and approved. Admin login: {admin_email} / {AUTO_PASSWORD}")
     return redirect("org_list")
 
 
