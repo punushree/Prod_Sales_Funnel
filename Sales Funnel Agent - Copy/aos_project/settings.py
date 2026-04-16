@@ -19,7 +19,7 @@ except ImportError:
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-this-in-production-use-env-var")
-DEBUG      = os.environ.get("DEBUG", "True") == "True"
+DEBUG=False
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
@@ -74,14 +74,13 @@ WSGI_APPLICATION = "aos_project.wsgi.application"
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'aos_agent_new',
-        'USER': 'root',
-        'PASSWORD': '1234',
-        'HOST': 'localhost',
-        'PORT': '3306',
+        'NAME': os.environ.get("DB_NAME"),
+        'USER': os.environ.get("DB_USER"),
+        'PASSWORD': os.environ.get("DB_PASSWORD"),
+        'HOST': os.environ.get("DB_HOST", "localhost"),
+        'PORT': os.environ.get("DB_PORT", "3306"),
     }
 }
-
 AUTH_USER_MODEL = "aos_agent.User"
 
 AUTHENTICATION_BACKENDS = [
